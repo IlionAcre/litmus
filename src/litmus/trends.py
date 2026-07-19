@@ -8,10 +8,11 @@ from litmus.storage import DEFAULT_RUNS_DIR
 
 _RESULT_STRUCT = (
     'STRUCT(test_case_id VARCHAR, raw_output VARCHAR, latency_ms DOUBLE, '
-    'cost_usd DOUBLE, "timestamp" TIMESTAMP)[]'
+    'cost_usd DOUBLE, "timestamp" TIMESTAMP, error VARCHAR)[]'
 )
 _SCORE_STRUCT = (
-    "STRUCT(test_case_id VARCHAR, passed BOOLEAN, score DOUBLE, explanation VARCHAR)[]"
+    "STRUCT(test_case_id VARCHAR, passed BOOLEAN, score DOUBLE, "
+    "explanation VARCHAR, error VARCHAR)[]"
 )
 
 # An explicit schema is required rather than read_json_auto's inference:

@@ -25,10 +25,16 @@ jobs:
           set -e
           mkdir -p /tmp/base_runs
           git fetch origin "${{ github.base_ref }}" --depth=1
+          # Use FETCH_HEAD, not "origin/<base_ref>" - a shallow fetch of a
+          # single ref (no refspec) only populates FETCH_HEAD, not
+          # refs/remotes/origin/<base_ref>. Referencing the remote-tracking
+          # name here would silently fail (swallowed by `|| true` below) and
+          # the gate would always skip, thinking there's no baseline.
+          #
           # `runs/` may not exist yet on the base branch (e.g. the very
           # first PR that adds any runs) - that's not an error, it just
           # means there's nothing to compare against yet.
-          git archive "origin/${{ github.base_ref }}" -- runs 2>/dev/null \
+          git archive FETCH_HEAD -- runs 2>/dev/null \
             | tar -x -C /tmp/base_runs 2>/dev/null || true
 
           BASELINE_RUN_ID=$(uv run python -c "
@@ -65,6 +71,11 @@ jobs:
         if: steps.baseline.outputs.skip == 'false'
         run: |
           set +e
+          # Explicit, not relying on the unstated default: without
+          # pipefail, `$?` after a pipe reflects `tee`'s exit code (always
+          # 0), not `litmus compare`'s - which would make the gate never
+          # fail regardless of the actual result.
+          set -o pipefail
           uv run litmus compare "${{ steps.baseline.outputs.run_id }}" \
             "${{ steps.candidate_run.outputs.run_id }}" | tee compare_output.txt
           echo "exit_code=$?" >> "$GITHUB_OUTPUT"

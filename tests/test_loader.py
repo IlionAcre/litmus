@@ -33,3 +33,14 @@ def test_schema_violation_raises_clear_error(tmp_path):
 
     with pytest.raises(TestCaseLoadError, match="bad_schema.json"):
         load_test_cases(tmp_path)
+
+
+def test_duplicate_test_case_id_raises_clear_error(tmp_path):
+    """Two files defining the same TestCase.id must fail loudly at load
+    time - the alternative is silently misbehaving later in compare.py's
+    by-id alignment, which is a much worse place to discover it."""
+    (tmp_path / "a.json").write_text(json.dumps({"id": "dup", "input": "hi"}))
+    (tmp_path / "b.json").write_text(json.dumps({"id": "dup", "input": "yo"}))
+
+    with pytest.raises(TestCaseLoadError, match="duplicate test case id 'dup'"):
+        load_test_cases(tmp_path)

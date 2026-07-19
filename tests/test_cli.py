@@ -1,4 +1,6 @@
+import json
 from itertools import count
+from pathlib import Path
 from unittest.mock import MagicMock
 
 from typer.testing import CliRunner
@@ -60,6 +62,48 @@ def test_litmus_run_requires_model_option():
     result = runner.invoke(app, ["run", "testsets/example"])
 
     assert result.exit_code != 0
+
+
+def test_litmus_run_isolates_a_failing_case_instead_of_crashing_the_batch(monkeypatch, tmp_path):
+    """A rate limit / auth / network error on one test case must not lose
+    every already-computed result in the batch - it's recorded as [ERROR]
+    and the run still gets persisted with everything else intact."""
+    case_002_input = json.loads(Path("testsets/example/case_002.json").read_text())["input"]
+
+    def fake_completion(model, messages):
+        if messages[0]["content"] == case_002_input:
+            raise RuntimeError("simulated rate limit error")
+        return _fake_response("positive")
+
+    monkeypatch.setattr("litellm.completion", fake_completion)
+    monkeypatch.setattr("litellm.completion_cost", lambda completion_response: 0.0001)
+
+    result = runner.invoke(
+        app,
+        [
+            "run",
+            "testsets/example",
+            "--model",
+            "gpt-4o-mini",
+            "--prompt-version",
+            "v1",
+            "--runs-dir",
+            str(tmp_path),
+        ],
+    )
+
+    assert result.exit_code == 0
+    assert "[PASS] case_001" in result.stdout
+    assert "[ERROR] case_002" in result.stdout
+    assert "1 case(s) had errors" in result.stdout
+    assert "simulated rate limit error" in result.stdout
+    assert "Saved run" in result.stdout
+    # the run is still persisted with both cases (one ok, one errored)
+    assert len(list(tmp_path.glob("*.json"))) == 1
+    saved = json.loads(next(tmp_path.glob("*.json")).read_text())
+    assert len(saved["results"]) == 2
+    errored_result = next(r for r in saved["results"] if r["test_case_id"] == "case_002")
+    assert errored_result["error"] is not None
 
 
 def _write_synthetic_testset(tmp_path, n_positive: int = 10, n_negative: int = 10):

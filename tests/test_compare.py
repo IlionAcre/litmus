@@ -153,3 +153,65 @@ def test_only_compares_common_test_case_ids():
 
     # only "a" and "b" are common; both passed in both runs -> no regression
     assert report.pass_rate.flagged is False
+
+
+def test_mismatched_test_case_sets_are_surfaced_not_hidden():
+    """A testset changing between baseline/candidate runs (cases added or
+    removed) is normal usage - it must not silently narrow the comparison
+    with no visible trace. The report has to carry exactly what was
+    excluded and why."""
+    baseline_results = _results(["a", "b", "extra_baseline_only"], latency=100.0, cost=0.001)
+    candidate_results = _results(["a", "b", "extra_candidate_only"], latency=100.0, cost=0.001)
+
+    report = compare_runs(
+        baseline_results,
+        _scores(["a", "b", "extra_baseline_only"], [True, True, True]),
+        candidate_results,
+        _scores(["a", "b", "extra_candidate_only"], [True, True, False]),
+    )
+
+    assert report.common_case_count == 2
+    assert report.baseline_only_ids == ["extra_baseline_only"]
+    assert report.candidate_only_ids == ["extra_candidate_only"]
+    assert report.errored_ids == []
+    assert report.has_mismatched_cases is True
+
+
+def test_fully_matching_runs_report_no_mismatch():
+    ids = ["a", "b"]
+    baseline_results = _results(ids, latency=100.0, cost=0.001)
+    candidate_results = _results(ids, latency=100.0, cost=0.001)
+
+    report = compare_runs(
+        baseline_results,
+        _scores(ids, [True, True]),
+        candidate_results,
+        _scores(ids, [True, True]),
+    )
+
+    assert report.common_case_count == 2
+    assert report.has_mismatched_cases is False
+
+
+def test_errored_cases_are_excluded_from_statistics_and_reported():
+    """A case that errored in either run (RunResult.error or
+    ScoreResult.error set) must not be silently counted as pass/fail in the
+    comparison statistics - it's excluded and surfaced via errored_ids,
+    same visibility mechanism as a mismatched test-case set."""
+    ids = ["a", "b", "c"]
+    baseline_results = _results(ids, latency=100.0, cost=0.001)
+    candidate_results = _results(ids, latency=100.0, cost=0.001)
+    baseline_scores = _scores(ids, [True, True, True])
+    candidate_scores = _scores(ids, [True, True, True])
+    # "c" errored on the candidate side - if it were silently counted as a
+    # real verdict it would still show "passed", masking the failure.
+    candidate_scores[2] = ScoreResult(
+        test_case_id="c", passed=False, score=0.0, explanation="", error="boom"
+    )
+
+    report = compare_runs(baseline_results, baseline_scores, candidate_results, candidate_scores)
+
+    assert report.common_case_count == 2
+    assert report.errored_ids == ["c"]
+    assert report.has_mismatched_cases is True
+    assert report.pass_rate.flagged is False  # "a" and "b" both still pass in both runs

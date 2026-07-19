@@ -5,7 +5,7 @@ from pydantic import BaseModel, ValidationError
 
 from litmus.schemas import RunResult, ScoreResult, TestCase
 
-DEFAULT_MODEL = "gpt-4o-mini"
+DEFAULT_MODEL = "gemini/gemini-2.5-flash-lite"
 
 JUDGE_PROMPT_TEMPLATE = """You are grading whether an AI system's output satisfies a rubric.
 

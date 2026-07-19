@@ -43,9 +43,10 @@ uv run litmus serve
   similarity (embeddings), and LLM-as-judge against a rubric. Pluggability is the
   differentiator over a naive string-diff eval.
 - **Comparison engine** — given a baseline run and a candidate run, computes
-  per-metric deltas with real significance testing (paired bootstrap or McNemar's
-  for pass/fail rates, Mann-Whitney for latency/cost) rather than eyeballing
-  percentages.
+  per-metric deltas with real significance testing: McNemar's test for
+  pass/fail rates, a paired bootstrap CI for latency/cost (both are paired,
+  same-test-case-before/after data, not independent samples) — rather than
+  eyeballing percentages.
 - **History store** — every run persisted with timestamp + prompt/model version,
   so trendlines are possible, not just single comparisons.
 - **CI gate** — a GitHub Action that runs the suite on a PR touching prompts/model
@@ -98,15 +99,18 @@ $0.001.
 
 ```text
 [REGRESSION] pass_rate: baseline=0.9643 candidate=0.5000 delta=-0.4643 p=0.0008741
-[ok] latency_ms: baseline=398.9126 candidate=373.5803 delta=-24.4858 p=0.6057
-[ok] cost_usd: baseline=0.0000 candidate=0.0000 delta=-0.0000 p=1.299e-10
+[ok] latency_ms: baseline=398.0661 candidate=373.5803 delta=-24.4858 95% CI=[-63.61, 11.93]
+[ok] cost_usd: baseline=0.0000 candidate=0.0000 delta=-0.0000 95% CI=[-3.6e-06, -3.6e-06]
 Result: REGRESSION DETECTED
 ```
 
 Pass rate dropped from **96.4% to 50.0%** — a 46-point swing — with
 **p = 0.00087** on the hand-rolled McNemar's test (paired pass/fail
-comparison), nowhere near noise. Cost dropped too (`p=1.3e-10`, also
-significant) but correctly **isn't** flagged as a regression: a cheaper
+comparison), nowhere near noise. Latency and cost use a paired bootstrap CI
+for the mean difference rather than a p-value, since they're paired
+(same-test-case, before/after) continuous data — latency's 95% CI straddles
+zero (no real effect), and cost's CI sits entirely below zero (a real
+decrease) but correctly **isn't** flagged as a regression: a cheaper
 candidate isn't a problem, `compare_runs()` only flags a metric moving in the
 *worse* direction, not just "changed."
 
@@ -123,15 +127,25 @@ reasonable), and it's caught with a real p-value instead of a gut feeling.
 API — there's no rendered frontend yet, see Architecture):
 
 ```text
-GET /compare/latest
+GET /compare/cd06b0e6c44d4db0a3584e8e608a2777/d8d16e16c5e442859ad1a13111c93ec0
 {"baseline_run_id":"cd06b0e6c44d4db0a3584e8e608a2777","candidate_run_id":"d8d16e16c5e442859ad1a13111c93ec0",
- "pass_rate":{"baseline_mean":0.9643,"candidate_mean":0.5,"delta":-0.4643,"p_value":0.000874,"flagged":true},
- "latency_ms":{...,"flagged":false},"cost_usd":{...,"flagged":false},"any_flagged":true}
+ "pass_rate":{"metric":"pass_rate","baseline_mean":0.9643,"candidate_mean":0.5,"delta":-0.4643,
+   "flagged":true,"p_value":0.000874,"ci_low":null,"ci_high":null},
+ "latency_ms":{"metric":"latency_ms",...,"flagged":false,"p_value":null,"ci_low":-64.94,"ci_high":10.32},
+ "cost_usd":{"metric":"cost_usd",...,"flagged":false,"p_value":null,"ci_low":-3.6e-6,"ci_high":-3.6e-6},
+ "any_flagged":true,"common_case_count":28,
+ "baseline_only_ids":[],"candidate_only_ids":[],"errored_ids":[]}
 
 GET /trends
 [{"run_id":"cd06...","prompt_version":"baseline","pass_rate":0.9643,...},
  {"run_id":"d8d1...","prompt_version":"candidate","pass_rate":0.5,...}]
 ```
+
+`common_case_count`/`baseline_only_ids`/`candidate_only_ids`/`errored_ids` make
+a narrowed comparison visible rather than silent — if a testset changes
+between runs, or a case errors out, the comparison still runs on whatever's
+left in common, but the report says so explicitly instead of quietly
+shrinking the sample.
 
 ## Milestones
 
@@ -162,12 +176,17 @@ persisted runs yet, the gate is skipped (nothing to compare against).
 
 ## Status
 
-All 10 milestones complete (72 tests passing, all offline/mocked except the
+All 10 milestones complete (79 tests passing, all offline/mocked except the
 real Gemini calls behind the case study above): schema, loader, runner, real
 `litellm` execution, the `litmus run`/`litmus compare`/`litmus serve` CLI,
-all three scorers, all three statistical tests, DuckDB-backed trend queries,
-the CI gate workflow (built and locally validated — not yet exercised
-against a live PR), the FastAPI dashboard, and the case study above.
+all three scorers, both statistical tests (McNemar's for pass/fail, paired
+bootstrap for latency/cost), DuckDB-backed trend queries, the CI gate
+workflow (built and locally validated — not yet exercised against a live
+PR), the FastAPI dashboard, and the case study above. A single test case's
+LLM/scoring failure is isolated (recorded as `[ERROR]`, doesn't lose the
+rest of the batch); mismatched or errored test cases between two runs being
+compared are excluded from the statistics but always surfaced explicitly,
+never silently dropped.
 
 Not yet built: a rendered frontend for the dashboard (it's a JSON API today)
 and a hosted/deployed version — both explicitly out of scope for now, see

@@ -23,6 +23,10 @@ def _report_dict(report: ComparisonReport) -> dict:
         "latency_ms": asdict(report.latency_ms),
         "cost_usd": asdict(report.cost_usd),
         "any_flagged": report.any_flagged,
+        "common_case_count": report.common_case_count,
+        "baseline_only_ids": report.baseline_only_ids,
+        "candidate_only_ids": report.candidate_only_ids,
+        "errored_ids": report.errored_ids,
     }
 
 
@@ -64,9 +68,12 @@ def get_latest_comparison() -> dict:
             status_code=404, detail="need at least 2 persisted runs to compare"
         )
     baseline, candidate = runs[-2], runs[-1]
-    report = compare_runs(
-        baseline.results, baseline.scores, candidate.results, candidate.scores
-    )
+    try:
+        report = compare_runs(
+            baseline.results, baseline.scores, candidate.results, candidate.scores
+        )
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e)) from e
     return {
         "baseline_run_id": baseline.run_id,
         "candidate_run_id": candidate.run_id,
@@ -82,9 +89,12 @@ def get_comparison(baseline_run_id: str, candidate_run_id: str) -> dict:
         candidate = load_run(candidate_run_id, runs_dir=_runs_dir())
     except FileNotFoundError as e:
         raise HTTPException(status_code=404, detail=str(e)) from e
-    report = compare_runs(
-        baseline.results, baseline.scores, candidate.results, candidate.scores
-    )
+    try:
+        report = compare_runs(
+            baseline.results, baseline.scores, candidate.results, candidate.scores
+        )
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e)) from e
     return {
         "baseline_run_id": baseline.run_id,
         "candidate_run_id": candidate.run_id,

@@ -25,6 +25,11 @@ class RunResult(BaseModel):
     latency_ms: float
     cost_usd: float
     timestamp: datetime
+    # Set iff the LLM call itself failed (network/rate-limit/auth/etc.) —
+    # distinct from a normal completed call, not silently coerced into an
+    # empty/zeroed "successful" result. raw_output/latency_ms/cost_usd are
+    # meaningless placeholders when this is set.
+    error: str | None = None
 
 
 class ScoreResult(BaseModel):
@@ -32,6 +37,11 @@ class ScoreResult(BaseModel):
     passed: bool
     score: float
     explanation: str
+    # Set iff scoring itself failed (e.g. an unparseable LLM-judge response,
+    # an embedding call failure) — distinct from a real pass/fail verdict,
+    # not silently coerced into either. passed/score are meaningless
+    # placeholders when this is set.
+    error: str | None = None
 
 
 class PersistedRun(BaseModel):

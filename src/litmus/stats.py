@@ -13,13 +13,6 @@ class BootstrapResult:
 
 
 @dataclass
-class MannWhitneyResult:
-    statistic: float
-    p_value: float
-    significant: bool
-
-
-@dataclass
 class McNemarResult:
     b: int  # baseline passed, candidate failed
     c: int  # baseline failed, candidate passed
@@ -35,24 +28,31 @@ def bootstrap_diff_ci(
     confidence: float = 0.95,
     random_state: int | None = None,
 ) -> BootstrapResult:
-    """Paired-independent bootstrap CI for the difference in means
-    (candidate - baseline). Vectorized for speed at realistic n_resamples."""
+    """Paired bootstrap CI for the mean difference (candidate - baseline).
+
+    baseline[i] and candidate[i] must correspond to the same unit (e.g. the
+    same test_case_id, before/after) — this is paired continuous data, not
+    two independent samples, so it resamples the per-unit differences
+    directly rather than resampling baseline and candidate independently
+    (which would silently ignore the pairing, same methodological error as
+    using Mann-Whitney U here — see CLAUDE.md)."""
+    if len(baseline) != len(candidate):
+        raise ValueError(
+            "baseline and candidate must be the same length (they are paired per unit)"
+        )
+
     rng = np.random.default_rng(random_state)
-    baseline_arr = np.asarray(baseline, dtype=float)
-    candidate_arr = np.asarray(candidate, dtype=float)
+    diffs = np.asarray(candidate, dtype=float) - np.asarray(baseline, dtype=float)
+    observed_diff = float(diffs.mean())
 
-    observed_diff = float(candidate_arr.mean() - baseline_arr.mean())
-
-    b_samples = rng.choice(
-        baseline_arr, size=(n_resamples, len(baseline_arr)), replace=True
-    )
-    c_samples = rng.choice(
-        candidate_arr, size=(n_resamples, len(candidate_arr)), replace=True
-    )
-    diffs = c_samples.mean(axis=1) - b_samples.mean(axis=1)
+    n = len(diffs)
+    resample_indices = rng.integers(0, n, size=(n_resamples, n))
+    resample_means = diffs[resample_indices].mean(axis=1)
 
     alpha = 1 - confidence
-    ci_low, ci_high = np.percentile(diffs, [100 * alpha / 2, 100 * (1 - alpha / 2)])
+    ci_low, ci_high = np.percentile(
+        resample_means, [100 * alpha / 2, 100 * (1 - alpha / 2)]
+    )
     significant = not (ci_low <= 0 <= ci_high)
 
     return BootstrapResult(
@@ -60,23 +60,6 @@ def bootstrap_diff_ci(
         ci_low=float(ci_low),
         ci_high=float(ci_high),
         significant=bool(significant),
-    )
-
-
-def mann_whitney_test(
-    baseline: list[float],
-    candidate: list[float],
-    alpha: float = 0.05,
-) -> MannWhitneyResult:
-    """Mann-Whitney U test for whether candidate's distribution differs from
-    baseline's (two-sided). Used for latency/cost deltas."""
-    statistic, p_value = scipy_stats.mannwhitneyu(
-        candidate, baseline, alternative="two-sided"
-    )
-    return MannWhitneyResult(
-        statistic=float(statistic),
-        p_value=float(p_value),
-        significant=bool(p_value < alpha),
     )
 
 

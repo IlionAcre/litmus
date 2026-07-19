@@ -4,7 +4,7 @@ import litellm
 
 from litmus.schemas import RunResult, ScoreResult, TestCase
 
-DEFAULT_MODEL = "text-embedding-3-small"
+DEFAULT_MODEL = "gemini/text-embedding-004"
 DEFAULT_THRESHOLD = 0.8
 
 

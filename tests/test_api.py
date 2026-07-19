@@ -119,3 +119,24 @@ def test_compare_named_runs_404s_on_missing_run(client, tmp_path):
     resp = client.get("/compare/a/nonexistent")
 
     assert resp.status_code == 404
+
+
+def test_compare_two_named_runs_with_zero_common_cases_returns_400_not_500(client, tmp_path):
+    target = RunTarget(prompt_version="v1", model_name="m1")
+    save_run(target, [_result("only_in_a")], [_score("only_in_a")], runs_dir=tmp_path, run_id="a")
+    save_run(target, [_result("only_in_b")], [_score("only_in_b")], runs_dir=tmp_path, run_id="b")
+
+    resp = client.get("/compare/a/b")
+
+    assert resp.status_code == 400
+    assert "no common test_case_ids" in resp.json()["detail"]
+
+
+def test_compare_latest_with_zero_common_cases_returns_400_not_500(client, tmp_path):
+    target = RunTarget(prompt_version="v1", model_name="m1")
+    save_run(target, [_result("only_in_a")], [_score("only_in_a")], runs_dir=tmp_path, run_id="a")
+    save_run(target, [_result("only_in_b")], [_score("only_in_b")], runs_dir=tmp_path, run_id="b")
+
+    resp = client.get("/compare/latest")
+
+    assert resp.status_code == 400

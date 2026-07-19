@@ -57,10 +57,26 @@ the project or change the tagline without the user explicitly asking.
   its built-in `completion_cost()`, avoiding hand-rolled per-provider pricing
   tables.
 
-- **Statistics: `scipy.stats`** for Mann-Whitney and bootstrap CIs. McNemar's
-  test (for paired pass/fail rate comparisons) is implemented manually as a
-  closed-form chi-square test rather than pulling in `statsmodels` for one
-  function.
+- **Statistics: `scipy.stats`.** McNemar's test (for paired pass/fail rate
+  comparisons) is implemented manually as a closed-form chi-square test
+  rather than pulling in `statsmodels` for one function. Latency/cost use a
+  **paired bootstrap CI** for the mean difference, not Mann-Whitney U.
+  - Revised decision (code review pass): Mann-Whitney U was removed
+    entirely (`stats.py`/`mann_whitney_test`/`MannWhitneyResult` deleted,
+    along with its tests) because it's the wrong tool for this project's
+    only use case — latency/cost deltas are **paired** data (same
+    `test_case_id`, before vs. after), and Mann-Whitney U is an
+    independent-samples test. Using it silently under-used the pairing
+    (still produced a valid p-value, just a methodologically weaker one).
+    `bootstrap_diff_ci` already existed but was *also* wrong in the same way
+    (it resampled baseline and candidate arrays independently rather than
+    resampling per-unit differences) and was unused dead code besides. Fixed
+    both problems in one move: `bootstrap_diff_ci` now resamples the
+    per-unit differences (`candidate[i] - baseline[i]`) directly — a genuine
+    paired bootstrap — and `compare.py` uses it for `latency_ms`/`cost_usd`.
+    `MetricComparison` now carries either `p_value` (pass_rate) or
+    `ci_low`/`ci_high` (latency_ms, cost_usd), never both; CLI/API output
+    changed accordingly (`p=...` vs `95% CI=[...]`).
 
 - **Semantic-similarity scoring: embeddings via `litellm.embedding()`**, not a
   local `sentence-transformers` model. Keeps the stack on one provider-access
@@ -70,6 +86,46 @@ the project or change the tagline without the user explicitly asking.
 
 - **Python 3.12**, `uv`-managed, own git repo — matches the convention of
   sibling projects in the parent Portfolio directory.
+
+- **Per-case error isolation, not batch-crashing.** `RunResult` and
+  `ScoreResult` each carry an `error: str | None` field. A single test
+  case's LLM call or scoring blowing up (rate limit, bad model name, auth
+  failure, an unparseable LLM-judge response, ...) no longer crashes
+  `litmus run` and loses every already-computed result — it's caught in
+  `cli.py`'s `_run_and_score`, recorded with `error` set (raw_output/passed
+  are meaningless sentinel placeholders in that case, not a real verdict),
+  printed as `[ERROR]` (distinct from PASS/FAIL, never coerced into either),
+  summarized at the end of the run's output, and the run is still persisted
+  with whatever cases did succeed. `compare.py`'s alignment then excludes
+  any case where either run recorded an error for it (see next item) so an
+  errored case can't quietly count as a real pass/fail in the statistics.
+  Known accepted gap: `trends.py`'s aggregates do **not** currently exclude
+  errored cases the same way `compare.py` does — an errored case still
+  contributes its sentinel 0.0 latency/cost/failed-pass into trend averages.
+  Not fixed in this pass (out of the scope that prompted it); worth doing
+  the same exclusion there if trend accuracy around errored runs matters.
+
+- **Comparison alignment is visible, not silently narrowed.**
+  `ComparisonReport` carries `common_case_count`, `baseline_only_ids`,
+  `candidate_only_ids`, and `errored_ids`. Previously, `compare.py`'s
+  `_align()` silently dropped any `test_case_id` not present in both runs
+  with zero visibility — a testset changing between baseline/candidate runs
+  (normal usage: cases added/removed) could narrow the comparison to a small
+  overlap that looked identical to a full one in the output. Now the CLI
+  (`compare` command) prints an explicit `WARNING: comparing N common test
+  case(s)` block listing what was excluded and why whenever
+  `report.has_mismatched_cases` is true, and the API includes the same
+  fields in its JSON response — never buried in a field nobody surfaces.
+
+- **Scorer defaults are Gemini models, matching the project's real
+  credential.** `SemanticSimilarityScorer`'s default was
+  `text-embedding-3-small` (OpenAI) and `LlmJudgeScorer`'s was `gpt-4o-mini`
+  (OpenAI), while the only real provider credential anywhere in this project
+  is `GEMINI_API_KEY` — neither scorer had ever actually been exercised
+  against a real provider, only mocks. Changed defaults to
+  `gemini/text-embedding-004` and `gemini/gemini-2.5-flash-lite`
+  respectively (both overridable via constructor args) so they work out of
+  the box against what's actually configured here.
 
 - **`litellm` pinned to `<1.90`.** Versions >=1.90 (tested: 1.92.0, 1.93.0)
   bundle a Rust-accelerated component (`litellm-rust`) with no prebuilt wheel
@@ -109,6 +165,31 @@ inference — this sidesteps per-file type inference entirely. `RunTrendPoint`'s
 `pass_rate`/`mean_latency_ms`/`mean_cost_usd` are `float | None` because of
 this (an average over zero test cases is undefined, not zero). Apply the
 same explicit-schema pattern to any future DuckDB query added over `runs/`.
+
+## Known gotcha: `actions/checkout`'s narrow fetch refspec breaks `origin/<ref>` lookups
+
+`.github/workflows/eval-gate.yml`'s baseline-lookup step used to `git fetch
+origin "$BASE_REF" --depth=1` then `git archive "origin/$BASE_REF" -- runs`.
+This silently never worked: `actions/checkout@v4` configures
+`remote.origin.fetch` as a **narrow, single-ref refspec** for only the
+checked-out PR branch (confirmed by reading `ref-helper.ts` in
+`actions/checkout`'s source — unqualified branch refs get
+`+refs/heads/<branch>:refs/remotes/origin/<branch>`, not a wildcard). A
+later `git fetch origin "$BASE_REF"` for a *different* ref (the base branch,
+not what was checked out) has no matching configured refspec, so it only
+populates `FETCH_HEAD` — `origin/$BASE_REF` never resolves, and the
+`git archive` call fails with `fatal: not a valid object name`, silently
+swallowed by the `2>/dev/null || true` guard meant only for the
+"no `runs/` dir on this branch yet" case. Net effect: the gate always
+printed "no baseline found" and never actually compared anything. Confirmed
+by reproducing both the bug and the fix in an isolated local repo with
+`actions/checkout`'s exact narrow-refspec configuration (not just a plain
+`git clone`, which sets up a wildcard refspec by default and masks this
+entirely). Fixed by referencing `FETCH_HEAD` instead of `origin/$BASE_REF` —
+`FETCH_HEAD` is unconditionally populated by any `git fetch`, regardless of
+refspec configuration. Apply the same pattern (reference `FETCH_HEAD`, not
+an assumed remote-tracking ref) to any future CI step that fetches a ref
+other than the one `actions/checkout` already checked out.
 
 ## Guardrails — don't do these without asking first
 
@@ -164,12 +245,25 @@ reference `GEMINI_API_KEY`/`gemini/gemini-2.5-flash-lite` to match.
 
 ## Status
 
-All 16 checkpoints complete (72 tests passing). Full pipeline built and
+All 16 checkpoints complete (79 tests passing). Full pipeline built and
 tested: schema, loader, runner, real litellm execution, the `litmus
-run`/`litmus compare`/`litmus serve` CLI commands, all three scorers, all
-three statistical tests, DuckDB-backed trend queries, the CI gate workflow,
-the FastAPI dashboard, and a real README case study (real Gemini calls,
-p=0.00087 caught regression — see `README.md`). Remaining, not gaps but
-explicit scope boundaries: Phase 8's workflow is locally validated only, not
-pushed/tested against a live PR; no rendered dashboard frontend; no hosted
-deployment. See `AI_docs/PHASES.md` for full detail.
+run`/`litmus compare`/`litmus serve` CLI commands, all three scorers,
+McNemar's + paired-bootstrap statistical tests, DuckDB-backed trend queries,
+the CI gate workflow, the FastAPI dashboard, and a real README case study
+(real Gemini calls, p=0.00087 caught regression — see `README.md`).
+
+A full close-reading code review pass (not just "tests pass") found and
+fixed several real issues: the CI gate's baseline git-fetch bug (see Known
+gotcha above), silent alignment-drop / no-error-visibility in `compare.py`,
+no error handling around real LLM calls, an API 500 on incompatible runs,
+OpenAI-specific scorer defaults with no real-provider credential to match,
+unused/methodologically-wrong Mann-Whitney U, a non-independent statistical
+test assertion, and no duplicate-test-case-id validation at load time. All
+fixed with tests; see the decision entries above for what changed and why.
+
+Remaining, not gaps but explicit scope boundaries: Phase 8's workflow is
+locally validated only, not pushed/tested against a live PR (still needs
+user go-ahead); no rendered dashboard frontend; no hosted deployment;
+`trends.py`'s aggregates don't yet exclude errored cases the way
+`compare.py` does (see the error-isolation decision above). See
+`AI_docs/PHASES.md` for full phase detail.
