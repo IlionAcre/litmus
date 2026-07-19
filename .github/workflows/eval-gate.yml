@@ -1,0 +1,88 @@
+name: Eval Gate
+
+on:
+  pull_request:
+    paths:
+      - "testsets/**"
+      - "src/litmus/**"
+
+jobs:
+  eval-gate:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout PR branch
+        uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v3
+
+      - name: Sync dependencies
+        run: uv sync --all-groups
+
+      - name: Fetch base branch's latest persisted run (if any)
+        id: baseline
+        run: |
+          set -e
+          mkdir -p /tmp/base_runs
+          git fetch origin "${{ github.base_ref }}" --depth=1
+          # `runs/` may not exist yet on the base branch (e.g. the very
+          # first PR that adds any runs) - that's not an error, it just
+          # means there's nothing to compare against yet.
+          git archive "origin/${{ github.base_ref }}" -- runs 2>/dev/null \
+            | tar -x -C /tmp/base_runs 2>/dev/null || true
+
+          BASELINE_RUN_ID=$(uv run python -c "
+          from litmus.trends import query_trends
+          points = query_trends(runs_dir='/tmp/base_runs/runs')
+          print(points[-1].run_id if points else '', end='')
+          ")
+
+          if [ -z "$BASELINE_RUN_ID" ]; then
+            echo "No baseline run found on ${{ github.base_ref }} - skipping regression gate for this PR."
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+          else
+            mkdir -p runs
+            cp "/tmp/base_runs/runs/$BASELINE_RUN_ID.json" runs/
+            echo "run_id=$BASELINE_RUN_ID" >> "$GITHUB_OUTPUT"
+            echo "skip=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Run eval suite against the PR branch
+        id: candidate_run
+        if: steps.baseline.outputs.skip == 'false'
+        env:
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+        run: |
+          set -e
+          OUTPUT=$(uv run litmus run testsets/example --model gpt-4o-mini \
+            --prompt-version "pr-${{ github.event.pull_request.number }}")
+          echo "$OUTPUT"
+          RUN_ID=$(echo "$OUTPUT" | tail -1 | sed -E 's/^Saved run ([a-f0-9]+) to.*/\1/')
+          echo "run_id=$RUN_ID" >> "$GITHUB_OUTPUT"
+
+      - name: Compare candidate against baseline
+        id: compare
+        if: steps.baseline.outputs.skip == 'false'
+        run: |
+          set +e
+          uv run litmus compare "${{ steps.baseline.outputs.run_id }}" \
+            "${{ steps.candidate_run.outputs.run_id }}" | tee compare_output.txt
+          echo "exit_code=$?" >> "$GITHUB_OUTPUT"
+
+      - name: Post comparison as a PR comment
+        if: steps.baseline.outputs.skip == 'false'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require("fs");
+            const body = fs.readFileSync("compare_output.txt", "utf8");
+            await github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: "**Litmus eval comparison**\n```\n" + body + "\n```",
+            });
+
+      - name: Fail the job if a regression was detected
+        if: steps.baseline.outputs.skip == 'false' && steps.compare.outputs.exit_code != '0'
+        run: exit 1

@@ -1,0 +1,6 @@
+{
+  "id": "case_001",
+  "input": "I absolutely loved this product, best purchase ever!",
+  "expected_output": "positive",
+  "tags": ["sentiment", "easy"]
+}

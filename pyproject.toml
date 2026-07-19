@@ -1,0 +1,33 @@
+[project]
+name = "litmus"
+version = "0.1.0"
+description = "Add your description here"
+requires-python = ">=3.12"
+dependencies = [
+    "duckdb>=1.5.4",
+    "fastapi>=0.139.2",
+    "litellm<1.90",
+    "numpy>=2.5.1",
+    "pydantic>=2.13.4",
+    "python-dotenv>=1.2.2",
+    "scipy>=1.18.0",
+    "typer>=0.27.0",
+    "uvicorn>=0.51.0",
+]
+
+[project.scripts]
+litmus = "litmus.cli:app"
+
+[build-system]
+requires = ["uv_build>=0.11.25,<0.12.0"]
+build-backend = "uv_build"
+
+[dependency-groups]
+dev = [
+    "httpx>=0.28.1",
+    "pytest>=9.1.1",
+    "pytest-cov>=7.1.0",
+]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

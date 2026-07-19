@@ -1,0 +1,92 @@
+import os
+from dataclasses import asdict
+from pathlib import Path
+
+from fastapi import FastAPI, HTTPException
+
+from litmus.compare import ComparisonReport, compare_runs
+from litmus.storage import DEFAULT_RUNS_DIR, load_run, load_runs
+from litmus.trends import query_trends
+
+app = FastAPI(title="Litmus Dashboard")
+
+
+def _runs_dir() -> Path:
+    """Resolved at request time (not import time) via LITMUS_RUNS_DIR so
+    tests can point the API at an isolated directory."""
+    return Path(os.environ.get("LITMUS_RUNS_DIR", str(DEFAULT_RUNS_DIR)))
+
+
+def _report_dict(report: ComparisonReport) -> dict:
+    return {
+        "pass_rate": asdict(report.pass_rate),
+        "latency_ms": asdict(report.latency_ms),
+        "cost_usd": asdict(report.cost_usd),
+        "any_flagged": report.any_flagged,
+    }
+
+
+@app.get("/trends")
+def get_trends() -> list[dict]:
+    """Historical trend points (pass rate, mean latency, mean cost) across
+    every persisted run, ordered chronologically."""
+    points = query_trends(runs_dir=_runs_dir())
+    return [
+        {
+            "run_id": p.run_id,
+            "prompt_version": p.prompt_version,
+            "model_name": p.model_name,
+            "created_at": p.created_at.isoformat(),
+            "pass_rate": p.pass_rate,
+            "mean_latency_ms": p.mean_latency_ms,
+            "mean_cost_usd": p.mean_cost_usd,
+        }
+        for p in points
+    ]
+
+
+@app.get("/runs/{run_id}")
+def get_run(run_id: str) -> dict:
+    """A single run's full per-case results and scores (drill-down view)."""
+    try:
+        run = load_run(run_id, runs_dir=_runs_dir())
+    except FileNotFoundError as e:
+        raise HTTPException(status_code=404, detail=str(e)) from e
+    return run.model_dump(mode="json")
+
+
+@app.get("/compare/latest")
+def get_latest_comparison() -> dict:
+    """Comparison between the two most recently persisted runs."""
+    runs = load_runs(runs_dir=_runs_dir())
+    if len(runs) < 2:
+        raise HTTPException(
+            status_code=404, detail="need at least 2 persisted runs to compare"
+        )
+    baseline, candidate = runs[-2], runs[-1]
+    report = compare_runs(
+        baseline.results, baseline.scores, candidate.results, candidate.scores
+    )
+    return {
+        "baseline_run_id": baseline.run_id,
+        "candidate_run_id": candidate.run_id,
+        **_report_dict(report),
+    }
+
+
+@app.get("/compare/{baseline_run_id}/{candidate_run_id}")
+def get_comparison(baseline_run_id: str, candidate_run_id: str) -> dict:
+    """Comparison between two explicitly-named persisted runs."""
+    try:
+        baseline = load_run(baseline_run_id, runs_dir=_runs_dir())
+        candidate = load_run(candidate_run_id, runs_dir=_runs_dir())
+    except FileNotFoundError as e:
+        raise HTTPException(status_code=404, detail=str(e)) from e
+    report = compare_runs(
+        baseline.results, baseline.scores, candidate.results, candidate.scores
+    )
+    return {
+        "baseline_run_id": baseline.run_id,
+        "candidate_run_id": candidate.run_id,
+        **_report_dict(report),
+    }

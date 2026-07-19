@@ -1,0 +1,6 @@
+{
+  "id": "case_002",
+  "input": "This was a complete waste of money, terrible quality.",
+  "expected_output": "negative",
+  "tags": ["sentiment", "easy"]
+}
