@@ -1,0 +1,374 @@
+{
+  "run_id": "cd06b0e6c44d4db0a3584e8e608a2777",
+  "prompt_version": "baseline",
+  "model_name": "gemini/gemini-2.5-flash-lite",
+  "created_at": "2026-07-19T04:44:28.166412Z",
+  "results": [
+    {
+      "test_case_id": "t01",
+      "raw_output": "urgent",
+      "latency_ms": 863.1312999932561,
+      "cost_usd": 0.000011099999999999999,
+      "timestamp": "2026-07-19T04:44:17.876501Z"
+    },
+    {
+      "test_case_id": "t02",
+      "raw_output": "urgent",
+      "latency_ms": 334.4337999878917,
+      "cost_usd": 0.000011099999999999999,
+      "timestamp": "2026-07-19T04:44:18.211146Z"
+    },
+    {
+      "test_case_id": "t03",
+      "raw_output": "urgent",
+      "latency_ms": 380.6040000054054,
+      "cost_usd": 0.000011,
+      "timestamp": "2026-07-19T04:44:18.592130Z"
+    },
+    {
+      "test_case_id": "t04",
+      "raw_output": "urgent",
+      "latency_ms": 331.03819997631945,
+      "cost_usd": 0.000011299999999999999,
+      "timestamp": "2026-07-19T04:44:18.923296Z"
+    },
+    {
+      "test_case_id": "t05",
+      "raw_output": "urgent",
+      "latency_ms": 444.51450000633486,
+      "cost_usd": 0.000011599999999999999,
+      "timestamp": "2026-07-19T04:44:19.368231Z"
+    },
+    {
+      "test_case_id": "t06",
+      "raw_output": "urgent",
+      "latency_ms": 363.85269998572767,
+      "cost_usd": 0.0000107,
+      "timestamp": "2026-07-19T04:44:19.732504Z"
+    },
+    {
+      "test_case_id": "t07",
+      "raw_output": "routine",
+      "latency_ms": 395.5104000051506,
+      "cost_usd": 0.0000112,
+      "timestamp": "2026-07-19T04:44:20.128452Z"
+    },
+    {
+      "test_case_id": "t08",
+      "raw_output": "routine",
+      "latency_ms": 327.2245000116527,
+      "cost_usd": 0.0000107,
+      "timestamp": "2026-07-19T04:44:20.454968Z"
+    },
+    {
+      "test_case_id": "t09",
+      "raw_output": "routine",
+      "latency_ms": 524.5589999831282,
+      "cost_usd": 0.000010599999999999998,
+      "timestamp": "2026-07-19T04:44:20.979880Z"
+    },
+    {
+      "test_case_id": "t10",
+      "raw_output": "routine",
+      "latency_ms": 340.1443999900948,
+      "cost_usd": 0.000010599999999999998,
+      "timestamp": "2026-07-19T04:44:21.319999Z"
+    },
+    {
+      "test_case_id": "t11",
+      "raw_output": "routine",
+      "latency_ms": 436.0838999855332,
+      "cost_usd": 0.000011099999999999999,
+      "timestamp": "2026-07-19T04:44:21.756194Z"
+    },
+    {
+      "test_case_id": "t12",
+      "raw_output": "routine",
+      "latency_ms": 297.52880000160076,
+      "cost_usd": 0.000010799999999999998,
+      "timestamp": "2026-07-19T04:44:22.054440Z"
+    },
+    {
+      "test_case_id": "t13",
+      "raw_output": "routine",
+      "latency_ms": 531.3978999911342,
+      "cost_usd": 0.0000112,
+      "timestamp": "2026-07-19T04:44:22.586094Z"
+    },
+    {
+      "test_case_id": "t14",
+      "raw_output": "routine",
+      "latency_ms": 339.3696999992244,
+      "cost_usd": 0.000010899999999999999,
+      "timestamp": "2026-07-19T04:44:22.924989Z"
+    },
+    {
+      "test_case_id": "t15",
+      "raw_output": "routine",
+      "latency_ms": 466.21630000299774,
+      "cost_usd": 0.000011799999999999999,
+      "timestamp": "2026-07-19T04:44:23.392187Z"
+    },
+    {
+      "test_case_id": "t16",
+      "raw_output": "routine",
+      "latency_ms": 335.77770000556484,
+      "cost_usd": 0.000010899999999999999,
+      "timestamp": "2026-07-19T04:44:23.727630Z"
+    },
+    {
+      "test_case_id": "t17",
+      "raw_output": "routine",
+      "latency_ms": 415.50390000338666,
+      "cost_usd": 0.000011499999999999998,
+      "timestamp": "2026-07-19T04:44:24.143387Z"
+    },
+    {
+      "test_case_id": "t18",
+      "raw_output": "routine",
+      "latency_ms": 302.0230999973137,
+      "cost_usd": 0.000011099999999999999,
+      "timestamp": "2026-07-19T04:44:24.445533Z"
+    },
+    {
+      "test_case_id": "t19",
+      "raw_output": "urgent",
+      "latency_ms": 446.144399989862,
+      "cost_usd": 0.0000112,
+      "timestamp": "2026-07-19T04:44:24.892400Z"
+    },
+    {
+      "test_case_id": "t20",
+      "raw_output": "routine",
+      "latency_ms": 290.02429998945445,
+      "cost_usd": 0.0000117,
+      "timestamp": "2026-07-19T04:44:25.182560Z"
+    },
+    {
+      "test_case_id": "t21",
+      "raw_output": "routine",
+      "latency_ms": 470.137700001942,
+      "cost_usd": 0.000010799999999999998,
+      "timestamp": "2026-07-19T04:44:25.652764Z"
+    },
+    {
+      "test_case_id": "t22",
+      "raw_output": "routine",
+      "latency_ms": 297.78589998022653,
+      "cost_usd": 0.0000112,
+      "timestamp": "2026-07-19T04:44:25.950568Z"
+    },
+    {
+      "test_case_id": "t23",
+      "raw_output": "routine",
+      "latency_ms": 431.1407000059262,
+      "cost_usd": 0.000011099999999999999,
+      "timestamp": "2026-07-19T04:44:26.381880Z"
+    },
+    {
+      "test_case_id": "t24",
+      "raw_output": "routine",
+      "latency_ms": 324.53240000177175,
+      "cost_usd": 0.000010799999999999998,
+      "timestamp": "2026-07-19T04:44:26.706998Z"
+    },
+    {
+      "test_case_id": "t25",
+      "raw_output": "routine",
+      "latency_ms": 386.5073000197299,
+      "cost_usd": 0.000011,
+      "timestamp": "2026-07-19T04:44:27.093079Z"
+    },
+    {
+      "test_case_id": "t26",
+      "raw_output": "routine",
+      "latency_ms": 351.8571000022348,
+      "cost_usd": 0.000011,
+      "timestamp": "2026-07-19T04:44:27.445058Z"
+    },
+    {
+      "test_case_id": "t27",
+      "raw_output": "routine",
+      "latency_ms": 385.1710000017192,
+      "cost_usd": 0.000010899999999999999,
+      "timestamp": "2026-07-19T04:44:27.830642Z"
+    },
+    {
+      "test_case_id": "t28",
+      "raw_output": "routine",
+      "latency_ms": 333.63539999118075,
+      "cost_usd": 0.0000112,
+      "timestamp": "2026-07-19T04:44:28.164410Z"
+    }
+  ],
+  "scores": [
+    {
+      "test_case_id": "t01",
+      "passed": true,
+      "score": 1.0,
+      "explanation": "exact match"
+    },
+    {
+      "test_case_id": "t02",
+      "passed": true,
+      "score": 1.0,
+      "explanation": "exact match"
+    },
+    {
+      "test_case_id": "t03",
+      "passed": true,
+      "score": 1.0,
+      "explanation": "exact match"
+    },
+    {
+      "test_case_id": "t04",
+      "passed": true,
+      "score": 1.0,
+      "explanation": "exact match"
+    },
+    {
+      "test_case_id": "t05",
+      "passed": true,
+      "score": 1.0,
+      "explanation": "exact match"
+    },
+    {
+      "test_case_id": "t06",
+      "passed": true,
+      "score": 1.0,
+      "explanation": "exact match"
+    },
+    {
+      "test_case_id": "t07",
+      "passed": true,
+      "score": 1.0,
+      "explanation": "exact match"
+    },
+    {
+      "test_case_id": "t08",
+      "passed": true,
+      "score": 1.0,
+      "explanation": "exact match"
+    },
+    {
+      "test_case_id": "t09",
+      "passed": true,
+      "score": 1.0,
+      "explanation": "exact match"
+    },
+    {
+      "test_case_id": "t10",
+      "passed": true,
+      "score": 1.0,
+      "explanation": "exact match"
+    },
+    {
+      "test_case_id": "t11",
+      "passed": true,
+      "score": 1.0,
+      "explanation": "exact match"
+    },
+    {
+      "test_case_id": "t12",
+      "passed": true,
+      "score": 1.0,
+      "explanation": "exact match"
+    },
+    {
+      "test_case_id": "t13",
+      "passed": true,
+      "score": 1.0,
+      "explanation": "exact match"
+    },
+    {
+      "test_case_id": "t14",
+      "passed": true,
+      "score": 1.0,
+      "explanation": "exact match"
+    },
+    {
+      "test_case_id": "t15",
+      "passed": true,
+      "score": 1.0,
+      "explanation": "exact match"
+    },
+    {
+      "test_case_id": "t16",
+      "passed": true,
+      "score": 1.0,
+      "explanation": "exact match"
+    },
+    {
+      "test_case_id": "t17",
+      "passed": true,
+      "score": 1.0,
+      "explanation": "exact match"
+    },
+    {
+      "test_case_id": "t18",
+      "passed": true,
+      "score": 1.0,
+      "explanation": "exact match"
+    },
+    {
+      "test_case_id": "t19",
+      "passed": false,
+      "score": 0.0,
+      "explanation": "expected 'routine', got 'urgent'"
+    },
+    {
+      "test_case_id": "t20",
+      "passed": true,
+      "score": 1.0,
+      "explanation": "exact match"
+    },
+    {
+      "test_case_id": "t21",
+      "passed": true,
+      "score": 1.0,
+      "explanation": "exact match"
+    },
+    {
+      "test_case_id": "t22",
+      "passed": true,
+      "score": 1.0,
+      "explanation": "exact match"
+    },
+    {
+      "test_case_id": "t23",
+      "passed": true,
+      "score": 1.0,
+      "explanation": "exact match"
+    },
+    {
+      "test_case_id": "t24",
+      "passed": true,
+      "score": 1.0,
+      "explanation": "exact match"
+    },
+    {
+      "test_case_id": "t25",
+      "passed": true,
+      "score": 1.0,
+      "explanation": "exact match"
+    },
+    {
+      "test_case_id": "t26",
+      "passed": true,
+      "score": 1.0,
+      "explanation": "exact match"
+    },
+    {
+      "test_case_id": "t27",
+      "passed": true,
+      "score": 1.0,
+      "explanation": "exact match"
+    },
+    {
+      "test_case_id": "t28",
+      "passed": true,
+      "score": 1.0,
+      "explanation": "exact match"
+    }
+  ]
+}

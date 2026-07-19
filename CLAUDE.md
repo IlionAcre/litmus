@@ -141,23 +141,35 @@ stays high-level only; don't duplicate phase detail here.
 8. CI gate via GitHub Action — **done (built + locally validated only — not
    pushed or tested against a live PR; needs user go-ahead)**
 9. Dashboard (FastAPI + DuckDB) — **done**
-10. README case study with a real caught regression — **blocked: needs a
-    real LLM API key (see below)**
+10. README case study with a real caught regression — **done**
 
 (Phases 2, 3, 6, and 7 are each split into sub-phases in `AI_docs/PHASES.md`
 — see that file for the full 16-checkpoint breakdown, the rationale for each
 split, and the authoritative current status table/resume point. This list is
 a high-level summary only and can lag — `AI_docs/PHASES.md` is truth.)
 
+## New decision: `GEMINI_API_KEY` is the project's real provider credential
+
+Phase 10 required making real LLM calls. The user added a real
+`GEMINI_API_KEY` to `Litmus/.env` (gitignored — never read/print/log that
+file or its value). `python-dotenv` was added as a dependency and `cli.py`
+calls `load_dotenv()` at module level, so any `uv run litmus ...` invocation
+has the key available automatically. The proven working model string is
+`gemini/gemini-2.5-flash-lite` (routed correctly by `litellm` via the
+`gemini/` provider prefix — no code changes needed). Note:
+`gemini-2.0-flash`/`gemini-2.0-flash-lite` (the models originally assumed)
+are deprecated as of this writing and return a 404 — use the 2.5 line.
+The CI gate workflow (`eval-gate.yml`) and README quickstart were updated to
+reference `GEMINI_API_KEY`/`gemini/gemini-2.5-flash-lite` to match.
+
 ## Status
 
-Phases 0-9 complete and tested (72 tests passing): schema, loader, runner,
-real litellm execution, the `litmus run`/`litmus compare`/`litmus serve` CLI
-commands, all three scorers, all three statistical tests, DuckDB-backed
-trend queries, the CI gate workflow, and the FastAPI dashboard (manually
-confirmed running end-to-end). Phase 10 is blocked: it's the one phase that
-requires making real, paid calls to an actual LLM provider (every other phase
-was deliberately built to run fully offline/mocked) to capture a genuine
-regression for the README case study, and no API key exists in this
-environment. See `AI_docs/PHASES.md`'s resume point for the exact next steps
-once a key is available.
+All 16 checkpoints complete (72 tests passing). Full pipeline built and
+tested: schema, loader, runner, real litellm execution, the `litmus
+run`/`litmus compare`/`litmus serve` CLI commands, all three scorers, all
+three statistical tests, DuckDB-backed trend queries, the CI gate workflow,
+the FastAPI dashboard, and a real README case study (real Gemini calls,
+p=0.00087 caught regression — see `README.md`). Remaining, not gaps but
+explicit scope boundaries: Phase 8's workflow is locally validated only, not
+pushed/tested against a live PR; no rendered dashboard frontend; no hosted
+deployment. See `AI_docs/PHASES.md` for full detail.

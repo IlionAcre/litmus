@@ -51,10 +51,10 @@ jobs:
         id: candidate_run
         if: steps.baseline.outputs.skip == 'false'
         env:
-          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
         run: |
           set -e
-          OUTPUT=$(uv run litmus run testsets/example --model gpt-4o-mini \
+          OUTPUT=$(uv run litmus run testsets/example --model gemini/gemini-2.5-flash-lite \
             --prompt-version "pr-${{ github.event.pull_request.number }}")
           echo "$OUTPUT"
           RUN_ID=$(echo "$OUTPUT" | tail -1 | sed -E 's/^Saved run ([a-f0-9]+) to.*/\1/')

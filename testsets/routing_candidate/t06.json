@@ -1,0 +1,8 @@
+{
+  "id": "t06",
+  "input": "You are a support ticket triage assistant. Classify the ticket below as \"urgent\" or \"routine\" based on how important or serious it seems.\n\nRespond with exactly one word: urgent or routine. Lowercase, no punctuation, no explanation.\n\nTicket: \"Payments are failing for all customers in the EU right now.\"",
+  "expected_output": "urgent",
+  "tags": [
+    "support-routing"
+  ]
+}

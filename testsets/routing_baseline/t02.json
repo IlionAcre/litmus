@@ -1,0 +1,8 @@
+{
+  "id": "t02",
+  "input": "You are a support ticket triage assistant. Classify the ticket below as \"urgent\" or \"routine\".\n\nMark it urgent if it involves: a complete service outage, permanent data loss, a security vulnerability/breach, a payment or billing failure, or an explicit threat to cancel the account.\nOtherwise mark it routine.\n\nRespond with exactly one word: urgent or routine. Lowercase, no punctuation, no explanation.\n\nTicket: \"We found a SQL injection vulnerability in the login form, this needs immediate attention.\"",
+  "expected_output": "urgent",
+  "tags": [
+    "support-routing"
+  ]
+}

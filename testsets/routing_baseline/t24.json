@@ -1,0 +1,8 @@
+{
+  "id": "t24",
+  "input": "You are a support ticket triage assistant. Classify the ticket below as \"urgent\" or \"routine\".\n\nMark it urgent if it involves: a complete service outage, permanent data loss, a security vulnerability/breach, a payment or billing failure, or an explicit threat to cancel the account.\nOtherwise mark it routine.\n\nRespond with exactly one word: urgent or routine. Lowercase, no punctuation, no explanation.\n\nTicket: \"Several users say search results have been irrelevant since the latest deploy.\"",
+  "expected_output": "routine",
+  "tags": [
+    "support-routing"
+  ]
+}

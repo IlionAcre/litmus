@@ -1,0 +1,374 @@
+{
+  "run_id": "d8d16e16c5e442859ad1a13111c93ec0",
+  "prompt_version": "candidate",
+  "model_name": "gemini/gemini-2.5-flash-lite",
+  "created_at": "2026-07-19T04:44:50.530141Z",
+  "results": [
+    {
+      "test_case_id": "t01",
+      "raw_output": "urgent",
+      "latency_ms": 506.75450000562705,
+      "cost_usd": 7.499999999999999e-6,
+      "timestamp": "2026-07-19T04:44:40.570168Z"
+    },
+    {
+      "test_case_id": "t02",
+      "raw_output": "urgent",
+      "latency_ms": 366.20340001536533,
+      "cost_usd": 7.499999999999999e-6,
+      "timestamp": "2026-07-19T04:44:40.935822Z"
+    },
+    {
+      "test_case_id": "t03",
+      "raw_output": "urgent",
+      "latency_ms": 375.1225999731105,
+      "cost_usd": 7.4e-6,
+      "timestamp": "2026-07-19T04:44:41.311350Z"
+    },
+    {
+      "test_case_id": "t04",
+      "raw_output": "urgent",
+      "latency_ms": 319.0770999935921,
+      "cost_usd": 7.699999999999999e-6,
+      "timestamp": "2026-07-19T04:44:41.631004Z"
+    },
+    {
+      "test_case_id": "t05",
+      "raw_output": "urgent",
+      "latency_ms": 415.21279999869876,
+      "cost_usd": 8e-6,
+      "timestamp": "2026-07-19T04:44:42.045995Z"
+    },
+    {
+      "test_case_id": "t06",
+      "raw_output": "urgent",
+      "latency_ms": 310.93910001800396,
+      "cost_usd": 7.1e-6,
+      "timestamp": "2026-07-19T04:44:42.356850Z"
+    },
+    {
+      "test_case_id": "t07",
+      "raw_output": "routine",
+      "latency_ms": 417.0573999872431,
+      "cost_usd": 7.6e-6,
+      "timestamp": "2026-07-19T04:44:42.774325Z"
+    },
+    {
+      "test_case_id": "t08",
+      "raw_output": "routine",
+      "latency_ms": 283.28470000997186,
+      "cost_usd": 7.1e-6,
+      "timestamp": "2026-07-19T04:44:43.058255Z"
+    },
+    {
+      "test_case_id": "t09",
+      "raw_output": "routine",
+      "latency_ms": 440.28480001725256,
+      "cost_usd": 6.999999999999999e-6,
+      "timestamp": "2026-07-19T04:44:43.498425Z"
+    },
+    {
+      "test_case_id": "t10",
+      "raw_output": "routine",
+      "latency_ms": 290.48149997834116,
+      "cost_usd": 6.999999999999999e-6,
+      "timestamp": "2026-07-19T04:44:43.789004Z"
+    },
+    {
+      "test_case_id": "t11",
+      "raw_output": "routine",
+      "latency_ms": 410.23670000140555,
+      "cost_usd": 7.499999999999999e-6,
+      "timestamp": "2026-07-19T04:44:44.199805Z"
+    },
+    {
+      "test_case_id": "t12",
+      "raw_output": "routine",
+      "latency_ms": 303.6514999985229,
+      "cost_usd": 7.199999999999999e-6,
+      "timestamp": "2026-07-19T04:44:44.503228Z"
+    },
+    {
+      "test_case_id": "t13",
+      "raw_output": "urgent",
+      "latency_ms": 420.5995000083931,
+      "cost_usd": 7.6e-6,
+      "timestamp": "2026-07-19T04:44:44.924566Z"
+    },
+    {
+      "test_case_id": "t14",
+      "raw_output": "urgent",
+      "latency_ms": 329.3167999945581,
+      "cost_usd": 7.2999999999999996e-6,
+      "timestamp": "2026-07-19T04:44:45.253510Z"
+    },
+    {
+      "test_case_id": "t15",
+      "raw_output": "urgent",
+      "latency_ms": 396.10199999879114,
+      "cost_usd": 8.2e-6,
+      "timestamp": "2026-07-19T04:44:45.650320Z"
+    },
+    {
+      "test_case_id": "t16",
+      "raw_output": "routine",
+      "latency_ms": 342.38089999416843,
+      "cost_usd": 7.2999999999999996e-6,
+      "timestamp": "2026-07-19T04:44:45.992588Z"
+    },
+    {
+      "test_case_id": "t17",
+      "raw_output": "urgent",
+      "latency_ms": 409.71839998383075,
+      "cost_usd": 7.899999999999999e-6,
+      "timestamp": "2026-07-19T04:44:46.402269Z"
+    },
+    {
+      "test_case_id": "t18",
+      "raw_output": "routine",
+      "latency_ms": 450.97370000439696,
+      "cost_usd": 7.499999999999999e-6,
+      "timestamp": "2026-07-19T04:44:46.853824Z"
+    },
+    {
+      "test_case_id": "t19",
+      "raw_output": "urgent",
+      "latency_ms": 291.49669999605976,
+      "cost_usd": 7.6e-6,
+      "timestamp": "2026-07-19T04:44:47.145198Z"
+    },
+    {
+      "test_case_id": "t20",
+      "raw_output": "urgent",
+      "latency_ms": 454.21369999530725,
+      "cost_usd": 8.099999999999999e-6,
+      "timestamp": "2026-07-19T04:44:47.599505Z"
+    },
+    {
+      "test_case_id": "t21",
+      "raw_output": "urgent",
+      "latency_ms": 311.84049998410046,
+      "cost_usd": 7.199999999999999e-6,
+      "timestamp": "2026-07-19T04:44:47.911854Z"
+    },
+    {
+      "test_case_id": "t22",
+      "raw_output": "urgent",
+      "latency_ms": 426.46839999360964,
+      "cost_usd": 7.6e-6,
+      "timestamp": "2026-07-19T04:44:48.338301Z"
+    },
+    {
+      "test_case_id": "t23",
+      "raw_output": "urgent",
+      "latency_ms": 309.248600009596,
+      "cost_usd": 7.499999999999999e-6,
+      "timestamp": "2026-07-19T04:44:48.648144Z"
+    },
+    {
+      "test_case_id": "t24",
+      "raw_output": "urgent",
+      "latency_ms": 408.97550000227056,
+      "cost_usd": 7.199999999999999e-6,
+      "timestamp": "2026-07-19T04:44:49.057226Z"
+    },
+    {
+      "test_case_id": "t25",
+      "raw_output": "urgent",
+      "latency_ms": 335.9731000091415,
+      "cost_usd": 7.4e-6,
+      "timestamp": "2026-07-19T04:44:49.393459Z"
+    },
+    {
+      "test_case_id": "t26",
+      "raw_output": "urgent",
+      "latency_ms": 416.420499997912,
+      "cost_usd": 7.4e-6,
+      "timestamp": "2026-07-19T04:44:49.810167Z"
+    },
+    {
+      "test_case_id": "t27",
+      "raw_output": "urgent",
+      "latency_ms": 383.37170000886545,
+      "cost_usd": 7.2999999999999996e-6,
+      "timestamp": "2026-07-19T04:44:50.193851Z"
+    },
+    {
+      "test_case_id": "t28",
+      "raw_output": "urgent",
+      "latency_ms": 334.8413000057917,
+      "cost_usd": 7.6e-6,
+      "timestamp": "2026-07-19T04:44:50.528137Z"
+    }
+  ],
+  "scores": [
+    {
+      "test_case_id": "t01",
+      "passed": true,
+      "score": 1.0,
+      "explanation": "exact match"
+    },
+    {
+      "test_case_id": "t02",
+      "passed": true,
+      "score": 1.0,
+      "explanation": "exact match"
+    },
+    {
+      "test_case_id": "t03",
+      "passed": true,
+      "score": 1.0,
+      "explanation": "exact match"
+    },
+    {
+      "test_case_id": "t04",
+      "passed": true,
+      "score": 1.0,
+      "explanation": "exact match"
+    },
+    {
+      "test_case_id": "t05",
+      "passed": true,
+      "score": 1.0,
+      "explanation": "exact match"
+    },
+    {
+      "test_case_id": "t06",
+      "passed": true,
+      "score": 1.0,
+      "explanation": "exact match"
+    },
+    {
+      "test_case_id": "t07",
+      "passed": true,
+      "score": 1.0,
+      "explanation": "exact match"
+    },
+    {
+      "test_case_id": "t08",
+      "passed": true,
+      "score": 1.0,
+      "explanation": "exact match"
+    },
+    {
+      "test_case_id": "t09",
+      "passed": true,
+      "score": 1.0,
+      "explanation": "exact match"
+    },
+    {
+      "test_case_id": "t10",
+      "passed": true,
+      "score": 1.0,
+      "explanation": "exact match"
+    },
+    {
+      "test_case_id": "t11",
+      "passed": true,
+      "score": 1.0,
+      "explanation": "exact match"
+    },
+    {
+      "test_case_id": "t12",
+      "passed": true,
+      "score": 1.0,
+      "explanation": "exact match"
+    },
+    {
+      "test_case_id": "t13",
+      "passed": false,
+      "score": 0.0,
+      "explanation": "expected 'routine', got 'urgent'"
+    },
+    {
+      "test_case_id": "t14",
+      "passed": false,
+      "score": 0.0,
+      "explanation": "expected 'routine', got 'urgent'"
+    },
+    {
+      "test_case_id": "t15",
+      "passed": false,
+      "score": 0.0,
+      "explanation": "expected 'routine', got 'urgent'"
+    },
+    {
+      "test_case_id": "t16",
+      "passed": true,
+      "score": 1.0,
+      "explanation": "exact match"
+    },
+    {
+      "test_case_id": "t17",
+      "passed": false,
+      "score": 0.0,
+      "explanation": "expected 'routine', got 'urgent'"
+    },
+    {
+      "test_case_id": "t18",
+      "passed": true,
+      "score": 1.0,
+      "explanation": "exact match"
+    },
+    {
+      "test_case_id": "t19",
+      "passed": false,
+      "score": 0.0,
+      "explanation": "expected 'routine', got 'urgent'"
+    },
+    {
+      "test_case_id": "t20",
+      "passed": false,
+      "score": 0.0,
+      "explanation": "expected 'routine', got 'urgent'"
+    },
+    {
+      "test_case_id": "t21",
+      "passed": false,
+      "score": 0.0,
+      "explanation": "expected 'routine', got 'urgent'"
+    },
+    {
+      "test_case_id": "t22",
+      "passed": false,
+      "score": 0.0,
+      "explanation": "expected 'routine', got 'urgent'"
+    },
+    {
+      "test_case_id": "t23",
+      "passed": false,
+      "score": 0.0,
+      "explanation": "expected 'routine', got 'urgent'"
+    },
+    {
+      "test_case_id": "t24",
+      "passed": false,
+      "score": 0.0,
+      "explanation": "expected 'routine', got 'urgent'"
+    },
+    {
+      "test_case_id": "t25",
+      "passed": false,
+      "score": 0.0,
+      "explanation": "expected 'routine', got 'urgent'"
+    },
+    {
+      "test_case_id": "t26",
+      "passed": false,
+      "score": 0.0,
+      "explanation": "expected 'routine', got 'urgent'"
+    },
+    {
+      "test_case_id": "t27",
+      "passed": false,
+      "score": 0.0,
+      "explanation": "expected 'routine', got 'urgent'"
+    },
+    {
+      "test_case_id": "t28",
+      "passed": false,
+      "score": 0.0,
+      "explanation": "expected 'routine', got 'urgent'"
+    }
+  ]
+}
