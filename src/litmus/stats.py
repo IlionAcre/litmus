@@ -19,6 +19,7 @@ class McNemarResult:
     statistic: float
     p_value: float
     significant: bool
+    method: str  # "no_discordant_pairs" / "exact_binomial" / "chi_square"
 
 
 def bootstrap_diff_ci(
@@ -67,10 +68,19 @@ def mcnemar_test(
     baseline_passed: list[bool],
     candidate_passed: list[bool],
     alpha: float = 0.05,
+    exact_threshold: int = 25,
 ) -> McNemarResult:
-    """Manually-implemented McNemar's test (with continuity correction) for
-    paired pass/fail-rate comparisons. Hand-rolled deliberately — see
-    CLAUDE.md: no `statsmodels` dependency for this one function."""
+    """Manually-implemented McNemar's test for paired pass/fail-rate
+    comparisons. Hand-rolled deliberately — see CLAUDE.md: no `statsmodels`
+    dependency for this one function.
+
+    Uses the exact binomial test (via scipy.stats.binomtest - already an
+    approved dependency, not statsmodels) when there are fewer than
+    `exact_threshold` discordant pairs, since the continuity-corrected
+    chi-square approximation is known to be unreliable at small sample
+    sizes. `exact_threshold=25` is a commonly-cited heuristic, not a
+    universal rule - see CLAUDE.md for the full rationale and how this
+    differs from the separate `power_warning` threshold in compare.py."""
     if len(baseline_passed) != len(candidate_passed):
         raise ValueError(
             "baseline_passed and candidate_passed must be the same length "
@@ -90,7 +100,21 @@ def mcnemar_test(
 
     if b + c == 0:
         # No discordant pairs at all: no evidence of any difference.
-        return McNemarResult(b=b, c=c, statistic=0.0, p_value=1.0, significant=False)
+        return McNemarResult(
+            b=b, c=c, statistic=0.0, p_value=1.0, significant=False,
+            method="no_discordant_pairs",
+        )
+
+    if b + c < exact_threshold:
+        exact = scipy_stats.binomtest(min(b, c), b + c, 0.5, alternative="two-sided")
+        return McNemarResult(
+            b=b,
+            c=c,
+            statistic=float(min(b, c)),
+            p_value=float(exact.pvalue),
+            significant=bool(exact.pvalue < alpha),
+            method="exact_binomial",
+        )
 
     statistic = (abs(b - c) - 1) ** 2 / (b + c)
     p_value = float(scipy_stats.chi2.sf(statistic, df=1))
@@ -101,4 +125,5 @@ def mcnemar_test(
         statistic=float(statistic),
         p_value=p_value,
         significant=bool(p_value < alpha),
+        method="chi_square",
     )

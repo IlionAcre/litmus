@@ -189,13 +189,14 @@ the project or change the tagline without the user explicitly asking.
   `stats.py` changes needed), flagged when the score got worse (lower) and
   the CI excludes zero, included in `any_flagged`. Caveat: `score` is only a
   genuinely continuous signal for `SemanticSimilarityScorer` (raw cosine
-  similarity) — `ExactMatchScorer`, `JsonSchemaMatchScorer`, and
-  `LlmJudgeScorer` all set `score = 1.0/0.0` mirroring `passed`, so for a
-  testset scored entirely by one of those three, `mean_score` is
-  mathematically close to redundant with `pass_rate`. `TestCase.scorer` is
-  per-case, so a testset can mix scorer types — in that case `mean_score`
-  pools continuous and boolean-mirrored values into one aggregate, still
-  informative but less interpretable than a homogeneously-scored testset.
+  similarity) or `LlmJudgeScorer` (the judge's own confidence score, see
+  revised decision below) — `ExactMatchScorer` and `JsonSchemaMatchScorer`
+  still set `score = 1.0/0.0` mirroring `passed`, so for a testset scored
+  entirely by one of those two, `mean_score` is mathematically close to
+  redundant with `pass_rate`. `TestCase.scorer` is per-case, so a testset can
+  mix scorer types — in that case `mean_score` pools continuous and
+  boolean-mirrored values into one aggregate, still informative but less
+  interpretable than a homogeneously-scored testset.
   Separately, the tool never told you whether a test set was even large
   enough for its own statistics to be trustworthy — a 2-case test set got
   the same confident-looking p-value treatment as a 200-case one.
@@ -212,15 +213,52 @@ the project or change the tagline without the user explicitly asking.
   (hand-picked keys, not a blanket `asdict(report)` — adding a field to
   `ComparisonReport` alone does **not** make it appear in the API response,
   `_report_dict()` must be edited too).
-  - Deliberately deferred, not silently dropped: upgrading `LlmJudgeScorer`
-    to emit a real confidence score (would make `mean_score` meaningful for
-    judge-scored cases too, but it's a separate design decision about
-    prompting/parsing) and switching McNemar's to an exact binomial test for
-    small discordant-pair counts (more statistically rigorous than a
-    warning, but a bigger change with its own test-independence
-    subtleties — see the McNemar's-test-independence entry above for why
-    that subtlety matters here specifically). A warning was the right size
-    for this pass; neither follow-up is scoped or started.
+  - Revised decision: both deferred follow-ups are now closed.
+    `LlmJudgeScorer` emits a real continuous `score` (0.0-1.0, the judge's
+    own confidence) instead of mirroring `passed` — `_JudgeVerdict` dropped
+    `passed` from the judge's JSON contract entirely (`{"score": ...,
+    "rationale": ...}`), and `passed = score >= threshold` is derived the
+    same way `SemanticSimilarityScorer` derives its boolean, rather than
+    asking the judge for a separate, independently-judged boolean (which
+    risked self-contradiction, e.g. `passed: true, confidence: 0.2`).
+    `threshold` defaults to `0.5` (a neutral midpoint — deliberately not
+    copying `SemanticSimilarityScorer`'s `0.8`, since there's no reason to
+    assume the same bias fits a judge's confidence scale) and is a
+    constructor arg, same pattern. Score validated via pydantic
+    `Field(ge=0.0, le=1.0)`, so an out-of-range value raises
+    `ValidationError`, already caught by the existing parse `except` block —
+    no structural change needed there. `mean_score` is now genuinely
+    informative for `llm_judge`-scored cases, not just
+    `semantic_similarity`-scored ones. This is a breaking change to the
+    judge's wire contract, made deliberately — no external users yet, and
+    keeping both a separate `passed` and `confidence` risked
+    self-contradiction for no real benefit.
+
+    `mcnemar_test()` gained an `exact_threshold: int = 25` parameter
+    (heuristic, not a universal rule — separate from and not to be confused
+    with `power_warning`'s `min_discordant_pairs=10`: that threshold asks
+    "is there enough evidence for any test to have power," this one asks
+    "which formula is still valid at this sample size"). Below the
+    threshold, `b + c` discordant pairs get the **exact binomial test**
+    (`scipy.stats.binomtest` — already an approved dependency, not
+    `statsmodels`) instead of the continuity-corrected chi-square
+    approximation, which is known to be unreliable at small samples.
+    `McNemarResult` gained `method: str` (`"no_discordant_pairs"` /
+    `"exact_binomial"` / `"chi_square"`) so callers can see which path ran.
+    This required restructuring `tests/test_stats_mcnemar.py`: the existing
+    `b=10, c=2` test framed itself as an *independent* cross-check of the
+    chi-square implementation against `scipy.stats.binomtest` — but once the
+    implementation itself started calling `binomtest` for that same
+    small-sample case, the check silently stopped being independent (it
+    became a direct-equality check against what the code now literally
+    calls). Verified directly, not assumed: exact p=0.03857421875 vs.
+    chi-square p~=0.04331 for that case — different formulas, same
+    conclusion, which is exactly why small samples get routed differently.
+    Reframed that test honestly as a direct-equality check, and added a new
+    `b=20, c=8` (28 discordant pairs, above the threshold) test that
+    preserves a genuine independent cross-check on the chi-square path
+    (exact p~=0.03570 vs. chi-square p~=0.03764 — close, not identical,
+    both agree on significance).
 
 ## Known gotcha: real wall-clock timing in tests is flaky
 

@@ -142,14 +142,15 @@ def compare_runs(
     treating baseline/candidate as independent samples (see CLAUDE.md).
 
     mean_score is only a genuinely continuous signal for cases scored by
-    SemanticSimilarityScorer (raw cosine similarity) - ExactMatchScorer,
-    JsonSchemaMatchScorer, and LlmJudgeScorer all set score=1.0/0.0 mirroring
-    `passed`, so for a testset scored entirely by one of those three this
-    metric is mathematically close to redundant with pass_rate. TestCase.scorer
-    is per-case, so a testset can mix scorer types - in that case mean_score
-    pools continuous and boolean-mirrored values into one aggregate, which is
-    still informative but less interpretable than a homogeneously-scored
-    testset (see CLAUDE.md).
+    SemanticSimilarityScorer (raw cosine similarity) or LlmJudgeScorer (the
+    judge's own confidence score) - ExactMatchScorer and JsonSchemaMatchScorer
+    still set score=1.0/0.0 mirroring `passed`, so for a testset scored
+    entirely by one of those two this metric is mathematically close to
+    redundant with pass_rate. TestCase.scorer is per-case, so a testset can
+    mix scorer types - in that case mean_score pools continuous and
+    boolean-mirrored values into one aggregate, which is still informative
+    but less interpretable than a homogeneously-scored testset (see
+    CLAUDE.md).
 
     power_warning is a purely advisory heuristic (never affects any_flagged
     or exit code), set when either len(aligned) < min_case_count or the

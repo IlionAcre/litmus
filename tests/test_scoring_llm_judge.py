@@ -24,7 +24,7 @@ def _fake_response(content: str) -> MagicMock:
     return response
 
 
-def test_judge_passes_on_valid_json_verdict(monkeypatch):
+def test_judge_passes_on_high_confidence_score(monkeypatch):
     scorer = LlmJudgeScorer()
     case = TestCase(
         id="c1", input="x", rubric="Output must be polite and mention a refund."
@@ -33,32 +33,65 @@ def test_judge_passes_on_valid_json_verdict(monkeypatch):
     monkeypatch.setattr(
         "litellm.completion",
         lambda model, messages: _fake_response(
-            '{"passed": true, "rationale": "polite and mentions refund"}'
+            '{"score": 0.9, "rationale": "polite and mentions refund"}'
         ),
     )
 
     score_result = scorer.score(case, _result("Sure, here's your refund!"))
 
     assert score_result.passed is True
-    assert score_result.score == 1.0
-    assert score_result.explanation == "polite and mentions refund"
+    assert score_result.score == 0.9
+    assert score_result.explanation == (
+        "judge score 0.9000 (threshold 0.5): polite and mentions refund"
+    )
 
 
-def test_judge_fails_on_valid_json_verdict_marking_failure(monkeypatch):
+def test_judge_fails_on_low_confidence_score(monkeypatch):
     scorer = LlmJudgeScorer()
     case = TestCase(id="c1", input="x", rubric="Must mention a refund.")
 
     monkeypatch.setattr(
         "litellm.completion",
         lambda model, messages: _fake_response(
-            '{"passed": false, "rationale": "no refund mentioned"}'
+            '{"score": 0.1, "rationale": "no refund mentioned"}'
         ),
     )
 
     score_result = scorer.score(case, _result("Have a nice day."))
 
     assert score_result.passed is False
-    assert score_result.score == 0.0
+    assert score_result.score == 0.1
+
+
+def test_judge_score_exactly_at_threshold_passes(monkeypatch):
+    """Threshold comparison is >=, not >, matching SemanticSimilarityScorer's
+    exact convention."""
+    scorer = LlmJudgeScorer(threshold=0.5)
+    case = TestCase(id="c1", input="x", rubric="Must be polite.")
+
+    monkeypatch.setattr(
+        "litellm.completion",
+        lambda model, messages: _fake_response('{"score": 0.5, "rationale": "borderline"}'),
+    )
+
+    score_result = scorer.score(case, _result("..."))
+
+    assert score_result.passed is True
+
+
+def test_judge_respects_non_default_threshold(monkeypatch):
+    scorer = LlmJudgeScorer(threshold=0.9)
+    case = TestCase(id="c1", input="x", rubric="Must be polite.")
+
+    monkeypatch.setattr(
+        "litellm.completion",
+        lambda model, messages: _fake_response('{"score": 0.7, "rationale": "mostly polite"}'),
+    )
+
+    score_result = scorer.score(case, _result("..."))
+
+    assert score_result.passed is False
+    assert score_result.score == 0.7
 
 
 def test_judge_raises_clear_error_on_unparseable_response(monkeypatch):
@@ -85,6 +118,21 @@ def test_judge_raises_clear_error_on_json_missing_required_fields(monkeypatch):
     monkeypatch.setattr(
         "litellm.completion",
         lambda model, messages: _fake_response('{"verdict": "yes"}'),
+    )
+
+    with pytest.raises(JudgeParseError):
+        scorer.score(case, _result("Sure thing."))
+
+
+def test_judge_raises_clear_error_on_out_of_range_score(monkeypatch):
+    """A judge score outside [0.0, 1.0] must fail loudly (Field(ge=0.0,
+    le=1.0) validation), not be silently clamped or accepted."""
+    scorer = LlmJudgeScorer()
+    case = TestCase(id="c1", input="x", rubric="Must be polite.")
+
+    monkeypatch.setattr(
+        "litellm.completion",
+        lambda model, messages: _fake_response('{"score": 1.5, "rationale": "very polite"}'),
     )
 
     with pytest.raises(JudgeParseError):
