@@ -25,11 +25,13 @@ def _report_dict(report: ComparisonReport) -> dict:
         "pass_rate": asdict(report.pass_rate),
         "latency_ms": asdict(report.latency_ms),
         "cost_usd": asdict(report.cost_usd),
+        "mean_score": asdict(report.mean_score),
         "any_flagged": report.any_flagged,
         "common_case_count": report.common_case_count,
         "baseline_only_ids": report.baseline_only_ids,
         "candidate_only_ids": report.candidate_only_ids,
         "errored_ids": report.errored_ids,
+        "power_warning": report.power_warning,
     }
 
 

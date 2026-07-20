@@ -180,6 +180,48 @@ the project or change the tagline without the user explicitly asking.
     run file before re-raising the same exception (behavior unchanged, just
     now visible in the log).
 
+- **A 4th comparison metric (`mean_score`) and a `power_warning` field.**
+  `ScoreResult.score` (a continuous value populated for every scored case)
+  was never actually read by `compare_runs()` — only the boolean `passed`
+  was — so a model quietly getting less confident/similar before enough
+  cases flip to move the pass rate went completely undetected. `mean_score`
+  closes this gap using the *existing* paired `bootstrap_diff_ci` (no
+  `stats.py` changes needed), flagged when the score got worse (lower) and
+  the CI excludes zero, included in `any_flagged`. Caveat: `score` is only a
+  genuinely continuous signal for `SemanticSimilarityScorer` (raw cosine
+  similarity) — `ExactMatchScorer`, `JsonSchemaMatchScorer`, and
+  `LlmJudgeScorer` all set `score = 1.0/0.0` mirroring `passed`, so for a
+  testset scored entirely by one of those three, `mean_score` is
+  mathematically close to redundant with `pass_rate`. `TestCase.scorer` is
+  per-case, so a testset can mix scorer types — in that case `mean_score`
+  pools continuous and boolean-mirrored values into one aggregate, still
+  informative but less interpretable than a homogeneously-scored testset.
+  Separately, the tool never told you whether a test set was even large
+  enough for its own statistics to be trustworthy — a 2-case test set got
+  the same confident-looking p-value treatment as a 200-case one.
+  `power_warning: str | None` (purely advisory — never affects `any_flagged`
+  or exit code) fires on two independent, parameterized thresholds
+  (`compare_runs(..., min_case_count: int = 10, min_discordant_pairs: int =
+  10)`): too few total common cases for the bootstrap-based metrics, or too
+  few McNemar discordant pairs (`b + c`, already computed by `mcnemar_test`)
+  for the chi-square approximation. These are heuristic thresholds, not a
+  formal statistical power calculation (that would require assuming a
+  target effect size, which nothing here does). Both surfaced in `cli.py`'s
+  `compare` output (a `NOTE:`-prefixed block, deliberately distinct from the
+  `WARNING:`-prefixed mismatch block) and in `api.py`'s `_report_dict()`
+  (hand-picked keys, not a blanket `asdict(report)` — adding a field to
+  `ComparisonReport` alone does **not** make it appear in the API response,
+  `_report_dict()` must be edited too).
+  - Deliberately deferred, not silently dropped: upgrading `LlmJudgeScorer`
+    to emit a real confidence score (would make `mean_score` meaningful for
+    judge-scored cases too, but it's a separate design decision about
+    prompting/parsing) and switching McNemar's to an exact binomial test for
+    small discordant-pair counts (more statistically rigorous than a
+    warning, but a bigger change with its own test-independence
+    subtleties — see the McNemar's-test-independence entry above for why
+    that subtlety matters here specifically). A warning was the right size
+    for this pass; neither follow-up is scoped or started.
+
 ## Known gotcha: real wall-clock timing in tests is flaky
 
 `litellm_call` (`llm.py`) measures latency via real `time.perf_counter()`.

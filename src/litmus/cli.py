@@ -225,6 +225,9 @@ def compare(
             "latency_ms_flagged": report.latency_ms.flagged,
             "cost_usd_delta": report.cost_usd.delta,
             "cost_usd_flagged": report.cost_usd.flagged,
+            "mean_score_delta": report.mean_score.delta,
+            "mean_score_flagged": report.mean_score.flagged,
+            "power_warning": report.power_warning,
         },
     )
 
@@ -256,7 +259,11 @@ def compare(
             )
         typer.echo("")
 
-    for metric in (report.pass_rate, report.latency_ms, report.cost_usd):
+    if report.power_warning:
+        typer.echo(f"NOTE: low statistical power - {report.power_warning}.")
+        typer.echo("")
+
+    for metric in (report.pass_rate, report.latency_ms, report.cost_usd, report.mean_score):
         flag = "REGRESSION" if metric.flagged else "ok"
         if metric.p_value is not None:
             typer.echo(

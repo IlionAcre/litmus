@@ -47,6 +47,19 @@ def _scores(ids: list[str], passed: list[bool]) -> list[ScoreResult]:
     ]
 
 
+def _scores_with_score(
+    ids: list[str], passed: list[bool], scores: list[float]
+) -> list[ScoreResult]:
+    """Like _scores, but with an independent continuous score value per case
+    (e.g. mimicking SemanticSimilarityScorer's raw cosine similarity) instead
+    of score mirroring passed - needed to test mean_score as a genuinely
+    continuous signal, not just a boolean in disguise."""
+    return [
+        ScoreResult(test_case_id=tid, passed=p, score=s, explanation="")
+        for tid, p, s in zip(ids, passed, scores, strict=True)
+    ]
+
+
 def test_detects_a_real_pass_rate_regression():
     ids = [f"c{i}" for i in range(20)]
     baseline_passed = [True] * 18 + [False] * 2
@@ -215,3 +228,87 @@ def test_errored_cases_are_excluded_from_statistics_and_reported():
     assert report.errored_ids == ["c"]
     assert report.has_mismatched_cases is True
     assert report.pass_rate.flagged is False  # "a" and "b" both still pass in both runs
+
+
+def test_mean_score_detects_a_real_regression_even_without_pass_fail_change():
+    """A model can quietly get less confident/similar well before enough
+    cases flip pass/fail to move the pass rate - mean_score must catch this
+    on its own, using the same continuous score every scorer already sets."""
+    ids = [f"c{i}" for i in range(20)]
+    passed = [True] * 20  # unchanged in both runs - pass_rate must not flag
+    rng = np.random.default_rng(7)
+    baseline_score_values = [
+        max(0.0, min(1.0, float(rng.normal(0.95, 0.02)))) for _ in ids
+    ]
+    candidate_score_values = [
+        max(0.0, min(1.0, float(rng.normal(0.70, 0.02)))) for _ in ids
+    ]
+
+    baseline_results = _results(ids, latency=100.0, cost=0.001)
+    candidate_results = _results(ids, latency=100.0, cost=0.001)
+
+    report = compare_runs(
+        baseline_results,
+        _scores_with_score(ids, passed, baseline_score_values),
+        candidate_results,
+        _scores_with_score(ids, passed, candidate_score_values),
+    )
+
+    assert report.pass_rate.flagged is False
+    assert report.mean_score.flagged is True
+    assert report.mean_score.delta < 0
+    assert report.any_flagged is True
+
+
+def test_mean_score_does_not_spuriously_flag_boolean_mirrored_scores():
+    """For the three scorers where score=1.0/0.0 mirrors passed exactly,
+    mean_score must degenerate sensibly - not spuriously flag when nothing
+    changed."""
+    ids = [f"c{i}" for i in range(20)]
+    passed = [True] * 18 + [False] * 2
+
+    baseline_results = _results(ids, latency=100.0, cost=0.001)
+    candidate_results = _results(ids, latency=100.0, cost=0.001)
+
+    report = compare_runs(
+        baseline_results,
+        _scores(ids, passed),
+        candidate_results,
+        _scores(ids, passed),
+    )
+
+    assert report.mean_score.flagged is False
+
+
+def test_power_warning_set_for_a_small_testset():
+    ids = ["a", "b", "c"]
+    baseline_results = _results(ids, latency=100.0, cost=0.001)
+    candidate_results = _results(ids, latency=100.0, cost=0.001)
+
+    report = compare_runs(
+        baseline_results,
+        _scores(ids, [True, True, True]),
+        candidate_results,
+        _scores(ids, [True, True, True]),
+    )
+
+    assert report.power_warning is not None
+    assert "test case" in report.power_warning
+
+
+def test_power_warning_none_for_a_normal_sized_testset_with_enough_discordant_pairs():
+    ids = [f"c{i}" for i in range(20)]
+    baseline_passed = [True] * 18 + [False] * 2
+    candidate_passed = [False] * 10 + [True] * 10  # b=10, c=2, b+c=12 >= default 10
+
+    baseline_results = _results(ids, latency=100.0, cost=0.001)
+    candidate_results = _results(ids, latency=100.0, cost=0.001)
+
+    report = compare_runs(
+        baseline_results,
+        _scores(ids, baseline_passed),
+        candidate_results,
+        _scores(ids, candidate_passed),
+    )
+
+    assert report.power_warning is None
