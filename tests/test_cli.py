@@ -174,6 +174,81 @@ def test_litmus_compare_detects_a_regression(monkeypatch, tmp_path):
     assert "REGRESSION DETECTED" in result.stdout
 
 
+def test_litmus_run_logs_structured_events(monkeypatch, tmp_path):
+    monkeypatch.setattr(
+        "litellm.completion",
+        lambda model, messages: _fake_response("positive"),
+    )
+    monkeypatch.setattr("litellm.completion_cost", lambda completion_response: 0.0001)
+
+    log_file = tmp_path / "run.jsonl"
+    result = runner.invoke(
+        app,
+        [
+            "--log-file",
+            str(log_file),
+            "run",
+            "testsets/example",
+            "--model",
+            "gpt-4o-mini",
+            "--prompt-version",
+            "v1",
+            "--runs-dir",
+            str(tmp_path / "runs"),
+        ],
+    )
+
+    assert result.exit_code == 0
+    lines = [json.loads(line) for line in log_file.read_text().splitlines()]
+    events = [line["event"] for line in lines]
+    assert "run_started" in events
+    assert "run_completed" in events
+    case_results = [line for line in lines if line["event"] == "case_result"]
+    assert any(
+        c["test_case_id"] == "case_001" and c["status"] == "PASS" for c in case_results
+    )
+    run_completed = next(line for line in lines if line["event"] == "run_completed")
+    assert run_completed["total"] == 2
+
+
+def test_litmus_run_logs_errored_case_result(monkeypatch, tmp_path):
+    case_002_input = json.loads(Path("testsets/example/case_002.json").read_text())["input"]
+
+    def fake_completion(model, messages):
+        if messages[0]["content"] == case_002_input:
+            raise RuntimeError("simulated rate limit error")
+        return _fake_response("positive")
+
+    monkeypatch.setattr("litellm.completion", fake_completion)
+    monkeypatch.setattr("litellm.completion_cost", lambda completion_response: 0.0001)
+
+    log_file = tmp_path / "run.jsonl"
+    result = runner.invoke(
+        app,
+        [
+            "--log-file",
+            str(log_file),
+            "run",
+            "testsets/example",
+            "--model",
+            "gpt-4o-mini",
+            "--prompt-version",
+            "v1",
+            "--runs-dir",
+            str(tmp_path / "runs"),
+        ],
+    )
+
+    assert result.exit_code == 0
+    lines = [json.loads(line) for line in log_file.read_text().splitlines()]
+    case_results = [line for line in lines if line["event"] == "case_result"]
+    errored = next(c for c in case_results if c["test_case_id"] == "case_002")
+    assert errored["status"] == "ERROR"
+    assert "simulated rate limit error" in errored["error"]
+    run_completed = next(line for line in lines if line["event"] == "run_completed")
+    assert run_completed["errored"] == 1
+
+
 def test_litmus_compare_reports_no_regression_when_both_targets_agree(monkeypatch, tmp_path):
     testset_dir = _write_synthetic_testset(tmp_path)
     runs_dir = tmp_path / "runs"

@@ -53,6 +53,9 @@ uv run litmus serve
   config and fails/comments if a regression is statistically significant.
 - **Dashboard** — minimal UI for the latest comparison, historical trends, and
   drill-down into failing cases.
+- **Structured logging** — every run, comparison, and API request is logged as
+  JSON Lines to `logs/litmus.jsonl` (rotating, gitignored), independent of the
+  console output — see Observability below.
 
 ## Stack
 
@@ -62,6 +65,22 @@ uv run litmus serve
 - `scipy.stats` for significance testing
 - JSON per run as the source of truth, queried via DuckDB (no database server)
 - Packaged as a pip-installable CLI (`litmus run`, `litmus compare`)
+
+## Observability
+
+Every `litmus run`/`litmus compare` invocation and every `litmus serve` API
+request is logged as structured JSON Lines to `logs/litmus.jsonl` (one JSON
+object per line, rotating at 5MB/3 backups), in addition to the normal
+console output:
+
+```text
+{"timestamp": "2026-07-20T17:27:46.47Z", "level": "INFO", "logger": "litmus",
+ "message": "run started", "event": "run_started", "testset_dir": "testsets/example",
+ "model": "gemini/gemini-2.5-flash-lite", "prompt_version": "v1", "case_count": 2}
+```
+
+Configurable via `--log-file`/`--log-level` (or `LITMUS_LOG_FILE`/
+`LITMUS_LOG_LEVEL`); defaults to `logs/litmus.jsonl` at `INFO`.
 
 ## Case study: catching a real prompt regression
 
@@ -176,13 +195,14 @@ persisted runs yet, the gate is skipped (nothing to compare against).
 
 ## Status
 
-All 10 milestones complete (79 tests passing, all offline/mocked except the
+All 10 milestones complete (86 tests passing, all offline/mocked except the
 real Gemini calls behind the case study above): schema, loader, runner, real
 `litellm` execution, the `litmus run`/`litmus compare`/`litmus serve` CLI,
 all three scorers, both statistical tests (McNemar's for pass/fail, paired
 bootstrap for latency/cost), DuckDB-backed trend queries, the CI gate
 workflow (built and locally validated — not yet exercised against a live
-PR), the FastAPI dashboard, and the case study above. A single test case's
+PR), the FastAPI dashboard, structured JSON-lines logging (see Observability
+above), and the case study above. A single test case's
 LLM/scoring failure is isolated (recorded as `[ERROR]`, doesn't lose the
 rest of the batch); mismatched or errored test cases between two runs being
 compared are excluded from the statistics but always surfaced explicitly,

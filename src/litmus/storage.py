@@ -1,10 +1,13 @@
+import logging
 import uuid
 from datetime import UTC, datetime
 from pathlib import Path
 
+from litmus.logging_config import LOGGER_NAME
 from litmus.schemas import PersistedRun, RunResult, RunTarget, ScoreResult
 
 DEFAULT_RUNS_DIR = Path("runs")
+logger = logging.getLogger(LOGGER_NAME)
 
 
 def save_run(
@@ -31,6 +34,10 @@ def save_run(
     tmp_path.write_text(run.model_dump_json(indent=2))
     tmp_path.replace(path)  # atomic rename: no partial-write readers
 
+    logger.info(
+        "run saved",
+        extra={"event": "run_saved", "run_id": run.run_id, "path": path},
+    )
     return run
 
 

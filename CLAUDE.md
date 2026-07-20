@@ -137,6 +137,36 @@ the project or change the tagline without the user explicitly asking.
   Windows dev environment's Rust/linker setup ever gets fixed, or if a future
   litellm release ships Windows wheels again — don't just bump blindly.
 
+- **Structured logging: stdlib `logging` + a custom JSON-lines formatter, no
+  new dependency.** Matches the same avoid-a-dependency-for-something-stdlib-
+  can-do precedent as the McNemar's/`statsmodels` decision above. Writes to
+  `logs/litmus.jsonl` (gitignored — a runtime artifact, unlike `runs/` which
+  holds meaningful committed demo data) via a stdlib
+  `logging.handlers.RotatingFileHandler` (5MB, 3 backups). Configured once
+  via a Typer `@app.callback()` in `cli.py` (`--log-file`/`--log-level`,
+  both with `envvar=` — `LITMUS_LOG_FILE`/`LITMUS_LOG_LEVEL`, mirroring the
+  existing `LITMUS_RUNS_DIR` pattern), which covers `run`/`compare` and, since
+  `litmus serve` runs `uvicorn.run` in-process, `api.py`'s route handlers too
+  (all via `logging.getLogger("litmus")`). `configure_logging()` closes and
+  clears any handlers already on that logger before adding a new one — it's
+  re-invoked on every CLI call in the same process (every test in a pytest
+  session included), and without clearing first, handlers would accumulate
+  (duplicate log lines) and leak file handles onto deleted `tmp_path` dirs.
+  `JsonFormatter.format()` uses `json.dumps(..., default=str)` since extra
+  log fields aren't guaranteed JSON-native (e.g. `testset_dir` is a `Path`).
+  Logged events: `run_started`, `case_result` (PASS/FAIL/ERROR),
+  `run_completed`, `comparison_performed`, `comparison_mismatch`,
+  `run_saved`, and one `api_request`/`api_error` pair per API route — all
+  drawn from data already surfaced via the existing `typer.echo`/HTTP output,
+  never expanding what's exposed, just adding a durable structured sink.
+  Never logs `.env` contents or `GEMINI_API_KEY` (`runner.py`/`llm.py` stay
+  untouched — deliberately thin passthroughs with no logging of their own;
+  all log calls sit at the orchestration layer where context is already
+  assembled). Scope boundary: `api.py` imported directly (e.g. `TestClient`
+  in tests, or bypassing `litmus serve`) won't have file logging configured —
+  acceptable, since an unconfigured logger is a silent no-op, not a crash,
+  and `litmus serve` is the documented way to run it.
+
 ## Known gotcha: real wall-clock timing in tests is flaky
 
 `litellm_call` (`llm.py`) measures latency via real `time.perf_counter()`.
@@ -245,11 +275,12 @@ reference `GEMINI_API_KEY`/`gemini/gemini-2.5-flash-lite` to match.
 
 ## Status
 
-All 16 checkpoints complete (79 tests passing). Full pipeline built and
+All 16 checkpoints complete (86 tests passing). Full pipeline built and
 tested: schema, loader, runner, real litellm execution, the `litmus
 run`/`litmus compare`/`litmus serve` CLI commands, all three scorers,
 McNemar's + paired-bootstrap statistical tests, DuckDB-backed trend queries,
-the CI gate workflow, the FastAPI dashboard, and a real README case study
+the CI gate workflow, the FastAPI dashboard, structured JSON-lines logging
+(`logs/litmus.jsonl`, see decision above), and a real README case study
 (real Gemini calls, p=0.00087 caught regression — see `README.md`).
 
 A full close-reading code review pass (not just "tests pass") found and

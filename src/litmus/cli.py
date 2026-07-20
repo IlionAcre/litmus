@@ -1,3 +1,4 @@
+import logging
 import os
 from datetime import UTC, datetime
 from pathlib import Path
@@ -8,6 +9,7 @@ from dotenv import load_dotenv
 from litmus.compare import compare_runs
 from litmus.llm import litellm_call
 from litmus.loader import load_test_cases
+from litmus.logging_config import LOGGER_NAME, configure_logging
 from litmus.runner import run_test_case
 from litmus.schemas import RunResult, RunTarget, ScoreResult, TestCase
 from litmus.scoring.registry import get_scorer
@@ -16,6 +18,23 @@ from litmus.storage import DEFAULT_RUNS_DIR, load_run, save_run
 load_dotenv()
 
 app = typer.Typer()
+logger = logging.getLogger(LOGGER_NAME)
+
+
+@app.callback()
+def main(
+    log_file: Path = typer.Option(
+        Path("logs/litmus.jsonl"),
+        "--log-file",
+        envvar="LITMUS_LOG_FILE",
+        help="Structured JSON-lines log file path",
+    ),
+    log_level: str = typer.Option(
+        "INFO", "--log-level", envvar="LITMUS_LOG_LEVEL", help="Logging level"
+    ),
+) -> None:
+    """Litmus: an LLM evaluation and regression-testing tool."""
+    configure_logging(log_file, log_level)
 
 
 def _run_and_score(
@@ -89,6 +108,16 @@ def run(
     whatever cases did succeed."""
     cases = load_test_cases(testset_dir)
     target = RunTarget(prompt_version=prompt_version, model_name=model)
+    logger.info(
+        "run started",
+        extra={
+            "event": "run_started",
+            "testset_dir": testset_dir,
+            "model": model,
+            "prompt_version": prompt_version,
+            "case_count": len(cases),
+        },
+    )
     results, scores = _run_and_score(cases, target)
 
     for result, score_result in zip(results, scores, strict=True):
@@ -99,6 +128,18 @@ def run(
         typer.echo(
             f"[{status}] {result.test_case_id}: {result.raw_output!r} "
             f"({result.latency_ms:.1f}ms, ${result.cost_usd:.6f})"
+        )
+        logger.log(
+            logging.ERROR if status == "ERROR" else logging.INFO,
+            f"case {status}: {result.test_case_id}",
+            extra={
+                "event": "case_result",
+                "test_case_id": result.test_case_id,
+                "status": status,
+                "latency_ms": result.latency_ms,
+                "cost_usd": result.cost_usd,
+                "error": result.error or score_result.error,
+            },
         )
 
     errored = [
@@ -114,6 +155,23 @@ def run(
 
     persisted = save_run(target, results, scores, runs_dir=runs_dir)
     typer.echo(f"Saved run {persisted.run_id} to {runs_dir}")
+
+    passed_count = sum(
+        1
+        for r, s in zip(results, scores, strict=True)
+        if not (r.error or s.error) and s.passed
+    )
+    logger.info(
+        "run completed",
+        extra={
+            "event": "run_completed",
+            "run_id": persisted.run_id,
+            "total": len(results),
+            "passed": passed_count,
+            "failed": len(results) - passed_count - len(errored),
+            "errored": len(errored),
+        },
+    )
 
 
 @app.command()
@@ -132,8 +190,33 @@ def compare(
     report = compare_runs(
         baseline.results, baseline.scores, candidate.results, candidate.scores
     )
+    logger.info(
+        "comparison performed",
+        extra={
+            "event": "comparison_performed",
+            "baseline_run_id": baseline_run_id,
+            "candidate_run_id": candidate_run_id,
+            "common_case_count": report.common_case_count,
+            "any_flagged": report.any_flagged,
+            "pass_rate_delta": report.pass_rate.delta,
+            "pass_rate_flagged": report.pass_rate.flagged,
+            "latency_ms_delta": report.latency_ms.delta,
+            "latency_ms_flagged": report.latency_ms.flagged,
+            "cost_usd_delta": report.cost_usd.delta,
+            "cost_usd_flagged": report.cost_usd.flagged,
+        },
+    )
 
     if report.has_mismatched_cases:
+        logger.warning(
+            "comparison has mismatched/errored cases",
+            extra={
+                "event": "comparison_mismatch",
+                "baseline_only_count": len(report.baseline_only_ids),
+                "candidate_only_count": len(report.candidate_only_ids),
+                "errored_count": len(report.errored_ids),
+            },
+        )
         typer.echo(f"WARNING: comparing {report.common_case_count} common test case(s).")
         if report.baseline_only_ids:
             typer.echo(
