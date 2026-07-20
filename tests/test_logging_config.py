@@ -1,5 +1,6 @@
 import json
 import logging
+import threading
 from pathlib import Path
 
 from litmus.logging_config import LOGGER_NAME, JsonFormatter, configure_logging
@@ -86,3 +87,43 @@ def test_configure_logging_actually_rotates(tmp_path):
 
     assert log_file.exists()
     assert (tmp_path / "litmus.jsonl.1").exists()
+
+
+def test_concurrent_logging_from_multiple_threads_produces_no_corrupt_lines(tmp_path):
+    """RotatingFileHandler's write+rollover happens inside the inherited
+    Handler.lock, so concurrent emit() calls should be fully serialized, not
+    interleaved. This exercises that guarantee for real instead of leaving it
+    as an unverified claim: many threads log concurrently, and every line
+    written must be independently parseable and none may be lost."""
+    log_file = tmp_path / "litmus.jsonl"
+    configure_logging(log_file, "INFO")
+    logger = logging.getLogger(LOGGER_NAME)
+
+    thread_count = 8
+    logs_per_thread = 50
+
+    def _log_many(thread_id: int) -> None:
+        for i in range(logs_per_thread):
+            logger.info(
+                "concurrent",
+                extra={"event": "concurrent_test", "thread_id": thread_id, "i": i},
+            )
+
+    threads = [
+        threading.Thread(target=_log_many, args=(t,)) for t in range(thread_count)
+    ]
+    for thread in threads:
+        thread.start()
+    for thread in threads:
+        thread.join()
+    for handler in logger.handlers:
+        handler.flush()
+
+    lines = log_file.read_text().splitlines()
+    assert len(lines) == thread_count * logs_per_thread
+
+    seen = set()
+    for line in lines:
+        payload = json.loads(line)  # raises if any line got interleaved/corrupted
+        seen.add((payload["thread_id"], payload["i"]))
+    assert len(seen) == thread_count * logs_per_thread

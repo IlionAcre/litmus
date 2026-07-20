@@ -59,8 +59,18 @@ def load_runs(runs_dir: Path | str = DEFAULT_RUNS_DIR) -> list[PersistedRun]:
     runs_dir = Path(runs_dir)
     if not runs_dir.exists():
         return []
-    runs = [
-        PersistedRun.model_validate_json(path.read_text())
-        for path in runs_dir.glob("*.json")
-    ]
+    runs = []
+    for path in runs_dir.glob("*.json"):
+        try:
+            runs.append(PersistedRun.model_validate_json(path.read_text()))
+        except Exception as e:  # noqa: BLE001 - log the corrupt file, then re-raise as-is
+            logger.error(
+                "failed to parse persisted run file",
+                extra={
+                    "event": "run_load_failed",
+                    "path": path,
+                    "error": f"{type(e).__name__}: {e}",
+                },
+            )
+            raise
     return sorted(runs, key=lambda r: r.created_at)

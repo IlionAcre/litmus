@@ -249,6 +249,61 @@ def test_litmus_run_logs_errored_case_result(monkeypatch, tmp_path):
     assert run_completed["errored"] == 1
 
 
+def test_litmus_run_with_invalid_testset_logs_and_exits_cleanly(tmp_path):
+    bad_testset = tmp_path / "bad_testset"
+    bad_testset.mkdir()
+    (bad_testset / "broken.json").write_text("{not valid json")
+
+    log_file = tmp_path / "run.jsonl"
+    result = runner.invoke(
+        app,
+        [
+            "--log-file",
+            str(log_file),
+            "run",
+            str(bad_testset),
+            "--model",
+            "gpt-4o-mini",
+            "--runs-dir",
+            str(tmp_path / "runs"),
+        ],
+    )
+
+    assert result.exit_code == 1
+    assert "Error:" in result.stdout
+    assert "Traceback" not in result.stdout
+
+    lines = [json.loads(line) for line in log_file.read_text().splitlines()]
+    failed = [line for line in lines if line["event"] == "testset_load_failed"]
+    assert len(failed) == 1
+    assert failed[0]["level"] == "ERROR"
+
+
+def test_litmus_compare_with_missing_run_logs_and_exits_cleanly(tmp_path):
+    log_file = tmp_path / "compare.jsonl"
+    result = runner.invoke(
+        app,
+        [
+            "--log-file",
+            str(log_file),
+            "compare",
+            "does-not-exist-1",
+            "does-not-exist-2",
+            "--runs-dir",
+            str(tmp_path / "runs"),
+        ],
+    )
+
+    assert result.exit_code == 1
+    assert "Error:" in result.stdout
+    assert "Traceback" not in result.stdout
+
+    lines = [json.loads(line) for line in log_file.read_text().splitlines()]
+    failed = [line for line in lines if line["event"] == "run_load_failed"]
+    assert len(failed) == 1
+    assert failed[0]["level"] == "ERROR"
+
+
 def test_litmus_compare_reports_no_regression_when_both_targets_agree(monkeypatch, tmp_path):
     testset_dir = _write_synthetic_testset(tmp_path)
     runs_dir = tmp_path / "runs"

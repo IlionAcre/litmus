@@ -1,7 +1,10 @@
+import json
+import logging
 from datetime import UTC, datetime
 
 import pytest
 
+from litmus.logging_config import LOGGER_NAME, configure_logging
 from litmus.schemas import RunResult, RunTarget, ScoreResult
 from litmus.storage import load_run, load_runs, save_run
 
@@ -90,3 +93,24 @@ def test_load_runs_orders_chronologically_not_by_filename(tmp_path):
     runs = load_runs(runs_dir=tmp_path)
 
     assert [r.run_id for r in runs] == ["z_created_first", "a_created_second"]
+
+
+def test_load_runs_logs_and_reraises_on_a_corrupt_run_file(tmp_path):
+    """A corrupt/unparseable run file must still fail load_runs (behavior
+    unchanged) but the failure must be visible in the structured log, not
+    only as an uncaught exception."""
+    log_file = tmp_path / "storage.jsonl"
+    configure_logging(log_file, "INFO")
+
+    (tmp_path / "corrupt.json").write_text("{not valid json")
+
+    with pytest.raises(Exception):  # noqa: B017 - pydantic/json error, exact type not the point
+        load_runs(runs_dir=tmp_path)
+
+    for handler in logging.getLogger(LOGGER_NAME).handlers:
+        handler.flush()
+    lines = [json.loads(line) for line in log_file.read_text().splitlines()]
+    failed = [line for line in lines if line["event"] == "run_load_failed"]
+    assert len(failed) == 1
+    assert failed[0]["level"] == "ERROR"
+    assert "corrupt.json" in failed[0]["path"]

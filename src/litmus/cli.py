@@ -8,7 +8,7 @@ from dotenv import load_dotenv
 
 from litmus.compare import compare_runs
 from litmus.llm import litellm_call
-from litmus.loader import load_test_cases
+from litmus.loader import TestCaseLoadError, load_test_cases
 from litmus.logging_config import LOGGER_NAME, configure_logging
 from litmus.runner import run_test_case
 from litmus.schemas import RunResult, RunTarget, ScoreResult, TestCase
@@ -106,7 +106,20 @@ def run(
     run. A case that errors (LLM call or scoring failure) doesn't abort the
     batch — it's recorded as [ERROR] and the run is still saved with
     whatever cases did succeed."""
-    cases = load_test_cases(testset_dir)
+    try:
+        cases = load_test_cases(testset_dir)
+    except TestCaseLoadError as e:
+        logger.error(
+            "failed to load test cases",
+            extra={
+                "event": "testset_load_failed",
+                "testset_dir": testset_dir,
+                "error": str(e),
+            },
+        )
+        typer.echo(f"Error: {e}")
+        raise typer.Exit(code=1) from e
+
     target = RunTarget(prompt_version=prompt_version, model_name=model)
     logger.info(
         "run started",
@@ -184,8 +197,16 @@ def compare(
 ) -> None:
     """Compare two already-persisted runs and print a statistically-grounded
     comparison report."""
-    baseline = load_run(baseline_run_id, runs_dir=runs_dir)
-    candidate = load_run(candidate_run_id, runs_dir=runs_dir)
+    try:
+        baseline = load_run(baseline_run_id, runs_dir=runs_dir)
+        candidate = load_run(candidate_run_id, runs_dir=runs_dir)
+    except FileNotFoundError as e:
+        logger.error(
+            "failed to load run for comparison",
+            extra={"event": "run_load_failed", "error": str(e)},
+        )
+        typer.echo(f"Error: {e}")
+        raise typer.Exit(code=1) from e
 
     report = compare_runs(
         baseline.results, baseline.scores, candidate.results, candidate.scores

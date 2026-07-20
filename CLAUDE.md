@@ -166,6 +166,19 @@ the project or change the tagline without the user explicitly asking.
   in tests, or bypassing `litmus serve`) won't have file logging configured —
   acceptable, since an unconfigured logger is a silent no-op, not a crash,
   and `litmus serve` is the documented way to run it.
+  - Revised (follow-up review pass): thread-safety of concurrent logging was
+    previously only a documented-and-true claim (verified by reading stdlib's
+    `Handler.handle()` source, never exercised by a test) — now covered by
+    `test_concurrent_logging_from_multiple_threads_produces_no_corrupt_lines`
+    (8 threads × 50 log calls, asserts every line is independently parseable
+    and none are lost). Two CLI/storage observability gaps also closed: `run`
+    now catches `TestCaseLoadError` and `compare` now catches
+    `FileNotFoundError` from `load_run` — both log an ERROR event
+    (`testset_load_failed`/`run_load_failed`) and exit cleanly (`Error: ...`,
+    code 1) instead of an uncaught traceback that never reached the log file.
+    `storage.load_runs` now logs `run_load_failed` for a corrupt/unparseable
+    run file before re-raising the same exception (behavior unchanged, just
+    now visible in the log).
 
 ## Known gotcha: real wall-clock timing in tests is flaky
 
