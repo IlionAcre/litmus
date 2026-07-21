@@ -99,11 +99,18 @@ the project or change the tagline without the user explicitly asking.
   with whatever cases did succeed. `compare.py`'s alignment then excludes
   any case where either run recorded an error for it (see next item) so an
   errored case can't quietly count as a real pass/fail in the statistics.
-  Known accepted gap: `trends.py`'s aggregates do **not** currently exclude
-  errored cases the same way `compare.py` does — an errored case still
-  contributes its sentinel 0.0 latency/cost/failed-pass into trend averages.
-  Not fixed in this pass (out of the scope that prompted it); worth doing
-  the same exclusion there if trend accuracy around errored runs matters.
+  Fixed (was an accepted gap, now resolved): `trends.py`'s aggregates
+  previously did **not** exclude errored cases the same way `compare.py`
+  does — an errored case's sentinel 0.0 latency/cost/failed-pass dragged
+  every trend average down, making a run with real failures look
+  artificially *better* on cost/latency, not just incomplete. Fixed by
+  excluding by error field independently per metric in `_TREND_QUERY`'s
+  three subqueries: `pass_rate`'s subquery filters `WHERE s.error IS NULL`,
+  `mean_latency_ms`/`mean_cost_usd`'s subqueries filter
+  `WHERE r.error IS NULL` — independently, not jointly, since a
+  scoring-only failure (`ScoreResult.error` set, `RunResult.error` unset)
+  has real latency/cost data that should still count even though it's
+  excluded from pass_rate.
 
 - **Comparison alignment is visible, not silently narrowed.**
   `ComparisonReport` carries `common_case_count`, `baseline_only_ids`,
@@ -300,6 +307,47 @@ the project or change the tagline without the user explicitly asking.
     rubric criteria each partial case missed. Conclusion: the judge
     confidence score works as intended in practice, not just in code; no
     prompt revision was needed.
+  - **A further review pass found three more real gaps, all now fixed:**
+    1. **The markdown-fence stripper was overfit to the one failure mode it
+       was built from.** The original line-based version broke on a
+       single-line fence with no internal newline (treated the whole line
+       as "the opening marker" and deleted it wholesale, leaving `''`) and
+       on prose before the fence (`"Here is my answer:\n\`\`\`json\n{...}\n\`\`\`"`
+       — a realistic model habit even when told to respond with ONLY the
+       JSON; `startswith("\`\`\`")` is `False` there, so the text came back
+       completely untouched). Fixed by switching to a regex
+       (`` ```(?:\w*\n)?(.*?)``` `` with `re.DOTALL`) that searches for a
+       fenced block anywhere in the text rather than assuming the markers
+       are the first/last *lines* — handles both cases plus every
+       previously-working variant, verified directly.
+    2. **No range validation on the new CLI thresholds.**
+       `litmus compare --confidence 1.5` crashed with a raw, unhandled
+       `ValueError` from `numpy.percentile` inside `bootstrap_diff_ci`
+       (confirmed live: empty stdout, exit 1, no useful message);
+       `--confidence` below 0 or `--alpha` outside `[0,1]` didn't crash but
+       silently produced meaningless results (a degenerate always-flagged
+       CI, or McNemar's always/never "significant"). Fixed via typer's
+       `min=`/`max=` on the `--alpha`/`--confidence` options (now a clean
+       usage error, exit code 2, not a crash) and `min=0` on the three
+       integer thresholds.
+    3. **Prompt injection into `LlmJudgeScorer` was structurally possible.**
+       `case.rubric`/`result.raw_output` were embedded unescaped into the
+       judge prompt — a system-under-test that itself echoes injected
+       content (plausible when test data comes from real production inputs,
+       as the README's own case study does with real support tickets) could
+       in principle manipulate the judge's verdict. This is a two-hop risk
+       (the SUT must itself be injectable, and the injected content must
+       survive into the graded output), not a trivial one-step exploit, and
+       full immunity isn't realistically achievable for any LLM-judge
+       pattern — so the fix is a low-cost mitigation, not a heavy defense:
+       `result.raw_output` is now wrapped in an explicit
+       `<output_to_grade>...</output_to_grade>` delimiter with a sentence
+       telling the judge everything inside is untrusted content to grade,
+       not instructions to follow. Documented here as a known, accepted
+       residual risk — not a guarantee of immunity — since this tool's
+       normal usage (a single person authoring and running their own local
+       test sets) makes it low-exploitability in practice, but real for the
+       CI-gate-on-production-data use case.
 
 ## Known gotcha: real wall-clock timing in tests is flaky
 
@@ -428,7 +476,5 @@ fixed with tests; see the decision entries above for what changed and why.
 
 Remaining, not gaps but explicit scope boundaries: Phase 8's workflow is
 locally validated only, not pushed/tested against a live PR (still needs
-user go-ahead); no rendered dashboard frontend; no hosted deployment;
-`trends.py`'s aggregates don't yet exclude errored cases the way
-`compare.py` does (see the error-isolation decision above). See
+user go-ahead); no rendered dashboard frontend; no hosted deployment. See
 `AI_docs/PHASES.md` for full phase detail.

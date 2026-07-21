@@ -131,6 +131,44 @@ def test_judge_strips_bare_code_fence_without_language_tag(monkeypatch):
     assert score_result.score == 0.2
 
 
+def test_judge_strips_single_line_code_fence_with_no_internal_newline(monkeypatch):
+    """A line-based stripper would treat the whole line as "the opening
+    marker" and delete it wholesale, leaving an empty string - the fence
+    markers aren't always on their own line."""
+    scorer = LlmJudgeScorer()
+    case = TestCase(id="c1", input="x", rubric="Must be polite.")
+
+    monkeypatch.setattr(
+        "litellm.completion",
+        lambda model, messages: _fake_response(
+            '```{"score": 0.8, "rationale": "quite polite"}```'
+        ),
+    )
+
+    score_result = scorer.score(case, _result("Sure thing."))
+
+    assert score_result.score == 0.8
+
+
+def test_judge_strips_code_fence_with_prose_before_it(monkeypatch):
+    """Models routinely add a sentence of prose before the fence even when
+    told to respond with ONLY the JSON - a stripper that only checks
+    startswith("```") would return this untouched and unparseable."""
+    scorer = LlmJudgeScorer()
+    case = TestCase(id="c1", input="x", rubric="Must be polite.")
+
+    monkeypatch.setattr(
+        "litellm.completion",
+        lambda model, messages: _fake_response(
+            'Here is my answer:\n```json\n{"score": 0.3, "rationale": "not very polite"}\n```'
+        ),
+    )
+
+    score_result = scorer.score(case, _result("Sure thing."))
+
+    assert score_result.score == 0.3
+
+
 def test_judge_raises_clear_error_on_unparseable_response(monkeypatch):
     """A judge that returns garbage must fail loudly, not be silently
     coerced into a pass/fail."""

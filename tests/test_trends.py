@@ -88,6 +88,54 @@ def test_handles_a_mix_of_populated_and_empty_runs(tmp_path):
     assert by_id["empty_run"].pass_rate is None
 
 
+def test_errored_cases_are_excluded_from_aggregates_independently_per_metric(tmp_path):
+    """An errored case's sentinel values (passed=False, latency_ms=0.0,
+    cost_usd=0.0 - see cli.py's _run_and_score) must not drag trend
+    aggregates down, and the exclusion must be independent per metric: a
+    case where only scoring failed (RunResult.error unset, ScoreResult.error
+    set) has real latency/cost data that should stay in those aggregates
+    even though it's excluded from pass_rate."""
+    target = RunTarget(prompt_version="v1", model_name="m1")
+    results = [
+        _result("c1", 100.0, 0.001),
+        # c2: the LLM call itself failed - sentinel 0.0/0.0, excluded from
+        # every aggregate.
+        RunResult(
+            test_case_id="c2", raw_output="", latency_ms=0.0, cost_usd=0.0,
+            timestamp=datetime.now(UTC), error="RuntimeError: simulated failure",
+        ),
+        # c3: the LLM call succeeded (real latency/cost) but scoring failed -
+        # should still count toward latency/cost, excluded only from pass_rate.
+        _result("c3", 50.0, 0.0005),
+    ]
+    scores = [
+        _score("c1", True),
+        ScoreResult(
+            test_case_id="c2", passed=False, score=0.0,
+            explanation="not scored: the run itself failed",
+            error="RuntimeError: simulated failure",
+        ),
+        ScoreResult(
+            test_case_id="c3", passed=False, score=0.0,
+            explanation="scoring failed", error="ValueError: simulated scoring failure",
+        ),
+    ]
+    save_run(target, results, scores, runs_dir=tmp_path, run_id="run_with_errors")
+
+    points = query_trends(runs_dir=tmp_path)
+
+    assert len(points) == 1
+    point = points[0]
+    # pass_rate: only c1 has scores.error IS NULL -> 1.0, not dragged down
+    # by c2/c3's sentinel passed=False.
+    assert point.pass_rate == pytest.approx(1.0)
+    # latency/cost: c1 and c3 both have results.error IS NULL -> real
+    # average of (100.0, 50.0) / (0.001, 0.0005), not dragged down by c2's
+    # sentinel 0.0/0.0.
+    assert point.mean_latency_ms == pytest.approx(75.0)
+    assert point.mean_cost_usd == pytest.approx(0.00075)
+
+
 def test_orders_multiple_runs_chronologically(tmp_path):
     target = RunTarget(prompt_version="v1", model_name="m1")
 

@@ -195,24 +195,35 @@ def compare(
         DEFAULT_RUNS_DIR, "--runs-dir", help="Directory persisted runs are read from"
     ),
     alpha: float = typer.Option(
-        0.05, "--alpha", help="Significance level for McNemar's test (pass_rate)"
+        0.05,
+        "--alpha",
+        min=0.0,
+        max=1.0,
+        help="Significance level for McNemar's test (pass_rate)",
     ),
     confidence: float = typer.Option(
-        0.95, "--confidence", help="Confidence level for the bootstrap CIs"
+        0.95,
+        "--confidence",
+        min=0.0,
+        max=1.0,
+        help="Confidence level for the bootstrap CIs",
     ),
     min_case_count: int = typer.Option(
         10,
         "--min-case-count",
+        min=0,
         help="power_warning threshold: minimum common test cases expected",
     ),
     min_discordant_pairs: int = typer.Option(
         10,
         "--min-discordant-pairs",
+        min=0,
         help="power_warning threshold: minimum McNemar discordant pairs expected",
     ),
     exact_threshold: int = typer.Option(
         25,
         "--exact-threshold",
+        min=0,
         help="Below this many discordant pairs, use the exact binomial test "
         "instead of the chi-square approximation for pass_rate",
     ),

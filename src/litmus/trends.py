@@ -21,6 +21,15 @@ _SCORE_STRUCT = (
 # list, which then fails avg() with "no function matches avg(JSON)" — either
 # for that file alone, or for the whole glob once mixed with populated runs.
 # Declaring the schema up front sidesteps per-file type inference entirely.
+#
+# Each subquery excludes errored cases independently, not jointly: a case
+# can have scores.error set (scoring failed) while results.error is unset
+# (the LLM call itself succeeded) — its latency/cost data is real and
+# should stay in those aggregates even though it's excluded from pass_rate.
+# Without this, an errored case's sentinel values (passed=False,
+# latency_ms=0.0, cost_usd=0.0 — see cli.py's _run_and_score) drag every
+# aggregate down, making a run with failures look artificially *better* on
+# cost/latency, not just incomplete.
 _TREND_QUERY = f"""
     SELECT
         run_id,
@@ -28,9 +37,11 @@ _TREND_QUERY = f"""
         model_name,
         created_at,
         (SELECT avg(CASE WHEN s.passed THEN 1.0 ELSE 0.0 END)
-         FROM UNNEST(scores) AS t(s)) AS pass_rate,
-        (SELECT avg(r.latency_ms) FROM UNNEST(results) AS t(r)) AS mean_latency_ms,
-        (SELECT avg(r.cost_usd) FROM UNNEST(results) AS t(r)) AS mean_cost_usd
+         FROM UNNEST(scores) AS t(s) WHERE s.error IS NULL) AS pass_rate,
+        (SELECT avg(r.latency_ms)
+         FROM UNNEST(results) AS t(r) WHERE r.error IS NULL) AS mean_latency_ms,
+        (SELECT avg(r.cost_usd)
+         FROM UNNEST(results) AS t(r) WHERE r.error IS NULL) AS mean_cost_usd
     FROM read_json(
         ?,
         columns={{
