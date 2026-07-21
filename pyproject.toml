@@ -32,29 +32,4 @@ dev = [
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 
-# [tool.litmus]
-# Uncomment and adjust any of these to override Litmus's defaults for this
-# project. CLI flags, where available, still override this file; this file
-# overrides the hardcoded defaults shown below.
-# runs_dir = "runs"
-# log_file = "logs/litmus.jsonl"
-# log_level = "INFO"
-# log_max_bytes = 5000000
-# log_backup_count = 3
-# host = "127.0.0.1"
-# port = 8000
-# alpha = 0.05
-# confidence = 0.95
-# min_case_count = 10
-# min_discordant_pairs = 10
-# exact_threshold = 25
-# n_resamples = 10000
-# max_workers = 4
-#
-# [tool.litmus.scorers.semantic_similarity]
-# model = "gemini/text-embedding-004"
-# threshold = 0.8
-#
-# [tool.litmus.scorers.llm_judge]
-# model = "gemini/gemini-2.5-flash-lite"
-# threshold = 0.5
+# Litmus's own configuration lives in litmus.toml, not here — see that file.

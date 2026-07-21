@@ -1,25 +1,29 @@
 """Consolidates every scattered CLI/threshold/scorer default into one place.
 
-Precedence is CLI flag > [tool.litmus] in pyproject.toml > hardcoded
-fallback below. Config-file resolution is deliberately a CLI-layer concern
-only - stats.py/compare.py/the scorer classes stay pure and config-unaware;
-only cli.py and scoring/registry.py read from this module (see CLAUDE.md)."""
+Precedence is CLI flag > litmus.toml > hardcoded fallback below.
+Config-file resolution is deliberately a CLI-layer concern only -
+stats.py/compare.py/the scorer classes stay pure and config-unaware; only
+cli.py and scoring/registry.py read from this module (see CLAUDE.md).
+
+litmus.toml is a standalone file, not a [tool.litmus] section in
+pyproject.toml - the system under test doesn't have to be a Python project
+itself for Litmus's own config to apply."""
 
 import tomllib
 from dataclasses import dataclass
 from pathlib import Path
 
-_PYPROJECT_FILENAME = "pyproject.toml"
+_CONFIG_FILENAME = "litmus.toml"
 
 
 class ConfigError(Exception):
-    """Raised when pyproject.toml's [tool.litmus] section has an invalid
-    value. Deliberately validated here rather than left to Typer's own
-    min=/max= option constraints: those apply to a *default* value the same
-    as a user-supplied one, but the resulting error message blames the CLI
-    flag (e.g. "Invalid value for '--alpha'") even when the user never
-    touched that flag and the bad value came from the config file - this
-    exception names pyproject.toml and the offending key directly instead."""
+    """Raised when litmus.toml has an invalid value. Deliberately validated
+    here rather than left to Typer's own min=/max= option constraints: those
+    apply to a *default* value the same as a user-supplied one, but the
+    resulting error message blames the CLI flag (e.g. "Invalid value for
+    '--alpha'") even when the user never touched that flag and the bad value
+    came from the config file - this exception names litmus.toml and the
+    offending key directly instead."""
 
 
 @dataclass(frozen=True)
@@ -60,35 +64,33 @@ def _validate(config: LitmusConfig) -> None:
         value = getattr(config, field_name)
         if not 0.0 <= value <= 1.0:
             raise ConfigError(
-                f"pyproject.toml's [tool.litmus] has {field_name} = {value!r}, "
+                f"litmus.toml has {field_name} = {value!r}, "
                 "which must be between 0.0 and 1.0"
             )
     for field_name in _NON_NEGATIVE_INT_FIELDS:
         value = getattr(config, field_name)
         if value < 0:
             raise ConfigError(
-                f"pyproject.toml's [tool.litmus] has {field_name} = {value!r}, "
+                f"litmus.toml has {field_name} = {value!r}, "
                 "which must not be negative"
             )
 
 
 def load_config(start_dir: Path | None = None) -> LitmusConfig:
-    """Load [tool.litmus] from pyproject.toml in `start_dir` (default: the
-    current working directory - litmus is documented as run from the
-    project root, so this does not walk up parent directories). A missing
-    file, missing [tool.litmus] section, or any missing key all fall back
-    to LitmusConfig's own hardcoded default for that field - no override is
-    ever required."""
-    pyproject_path = (start_dir or Path.cwd()) / _PYPROJECT_FILENAME
+    """Load litmus.toml from `start_dir` (default: the current working
+    directory - litmus is documented as run from the project root, so this
+    does not walk up parent directories). A missing file, missing key, or
+    empty file all fall back to LitmusConfig's own hardcoded default for
+    that field - no override is ever required."""
+    config_path = (start_dir or Path.cwd()) / _CONFIG_FILENAME
     values: dict = {}
 
-    if pyproject_path.exists():
-        with pyproject_path.open("rb") as f:
+    if config_path.exists():
+        with config_path.open("rb") as f:
             data = tomllib.load(f)
-        litmus_section = data.get("tool", {}).get("litmus", {})
-        scorers_section = litmus_section.get("scorers", {})
+        scorers_section = data.get("scorers", {})
 
-        for key, value in litmus_section.items():
+        for key, value in data.items():
             if key != "scorers":
                 values[key] = value
 

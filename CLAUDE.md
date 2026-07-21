@@ -455,7 +455,7 @@ are deprecated as of this writing and return a 404 — use the 2.5 line.
 The CI gate workflow (`eval-gate.yml`) and README quickstart were updated to
 reference `GEMINI_API_KEY`/`gemini/gemini-2.5-flash-lite` to match.
 
-## New decision: consolidated config via `[tool.litmus]` in `pyproject.toml`
+## New decision: consolidated config via standalone `litmus.toml`
 
 Every tunable value in Litmus was a scattered hardcoded default: 11
 `typer.Option` defaults across `cli.py`'s three commands, `DEFAULT_MODEL`/
@@ -464,14 +464,28 @@ Every tunable value in Litmus was a scattered hardcoded default: 11
 `storage.py`'s `DEFAULT_RUNS_DIR` — none overridable except by editing
 source or passing CLI flags one invocation at a time. New module
 `src/litmus/config.py`: `LitmusConfig` (frozen dataclass, one field per
-scattered value) + `load_config()`, reading `[tool.litmus]` from
-`pyproject.toml` via stdlib `tomllib` (no new dependency —
-`requires-python = ">=3.12"` guarantees it). Reuses the file that already
-holds `[tool.pytest.ini_options]` rather than inventing a new location.
-Precedence: **CLI flag > `[tool.litmus]` > hardcoded fallback**. A missing
-file/section/key all fall back gracefully — no override is ever required;
-the actual `pyproject.toml` ships this fully commented-out as documentation
-of every available key, not a live section.
+scattered value) + `load_config()`, reading a standalone `litmus.toml` at
+the project root via stdlib `tomllib` (no new dependency —
+`requires-python = ">=3.12"` guarantees it). Precedence: **CLI flag >
+`litmus.toml` > hardcoded fallback**. A missing file/key all fall back
+gracefully — no override is ever required; the actual `litmus.toml` ships
+fully commented-out as documentation of every available key, not a live
+override.
+
+- **Revised from the original design**: this lived in `pyproject.toml`'s
+  `[tool.litmus]` section at first (reusing the file that already holds
+  `[tool.pytest.ini_options]`). Moved to a standalone file after explicitly
+  weighing the tradeoff: tying Litmus's own config to `pyproject.toml`
+  presupposes the *system under test* is itself a Python project, which
+  isn't guaranteed — Litmus's actual pitch is testing any LLM-backed system
+  (a Node backend, a bare API, anything), so a project being evaluated by
+  Litmus might have no `pyproject.toml` at all, or an unrelated one. A
+  standalone `litmus.toml` (flat top-level keys, no `[tool.litmus]`
+  wrapper needed since the whole file belongs to Litmus, `[scorers.*]` for
+  scorer-specific settings) mirrors the well-established `ruff.toml`/
+  `pyproject.toml` precedent. No external users existed yet, so this was a
+  full migration, not dual-location support — one unambiguous config
+  location, no precedence-between-two-files complexity to reason about.
 
 Config-file resolution is deliberately a CLI-layer concern only —
 `stats.py`/`compare.py`/the scorer classes keep their exact original
@@ -486,8 +500,8 @@ radius small.
 `load_config()` validates range-constrained fields itself (`alpha`/
 `confidence` in `[0,1]`; `min_case_count`/`min_discordant_pairs`/
 `exact_threshold`/`n_resamples`/`max_workers`/`port` non-negative) and
-raises `ConfigError` naming `pyproject.toml`'s `[tool.litmus]` and the
-offending key directly. This was confirmed necessary, not just cautious:
+raises `ConfigError` naming `litmus.toml` and the offending key directly.
+This was confirmed necessary, not just cautious:
 tested empirically that Typer/Click's own `min=`/`max=` option constraints
 *do* apply to a programmatically-supplied default the same as a
 user-supplied value (so a bad config value can't silently produce nonsense

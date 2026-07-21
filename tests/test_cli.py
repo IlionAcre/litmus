@@ -493,11 +493,11 @@ def test_litmus_compare_prints_mismatch_warning_with_excluded_ids(monkeypatch, t
     assert "1 only in candidate (excluded): case_d" in result.stdout
 
 
-def test_litmus_compare_picks_up_pyproject_toml_override_without_a_cli_flag(monkeypatch, tmp_path):
+def test_litmus_compare_picks_up_litmus_toml_override_without_a_cli_flag(monkeypatch, tmp_path):
     """Config-file precedence must actually work end-to-end: CLI flag >
-    [tool.litmus] in pyproject.toml > hardcoded fallback. Complements
+    litmus.toml > hardcoded fallback. Complements
     test_litmus_compare_min_case_count_option_changes_power_warning (which
-    covers the CLI-flag layer) by proving the pyproject.toml layer.
+    covers the CLI-flag layer) by proving the litmus.toml layer.
     typer.Option's default is evaluated once at module-import time from
     CONFIG, so exercising a config-file override requires actually reloading
     cli.py against a fake project directory, not just monkeypatching
@@ -515,8 +515,8 @@ def test_litmus_compare_picks_up_pyproject_toml_override_without_a_cli_flag(monk
     baseline_id = _run(testset_dir, "same-model", runs_dir)
     candidate_id = _run(testset_dir, "same-model", runs_dir)
 
-    (tmp_path / "pyproject.toml").write_text(
-        "[tool.litmus]\nmin_case_count = 1\nmin_discordant_pairs = 0\n"
+    (tmp_path / "litmus.toml").write_text(
+        "min_case_count = 1\nmin_discordant_pairs = 0\n"
     )
     original_cwd = Path.cwd()
     try:
