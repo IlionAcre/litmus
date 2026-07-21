@@ -81,6 +81,24 @@ def test_json_schema_match_fails_on_structurally_different_json():
     assert score_result.passed is False
 
 
+def test_json_schema_match_requires_expected_output():
+    scorer = JsonSchemaMatchScorer()
+    case = TestCase(id="c1", input="x")
+
+    with pytest.raises(ValueError, match="expected_output"):
+        scorer.score(case, _result('{"a": 1}'))
+
+
+def test_json_schema_match_raises_when_expected_output_itself_is_invalid_json():
+    """Previously claimed (but never actually tested) to fail loudly - this
+    proves it, rather than just asserting the code reads that way."""
+    scorer = JsonSchemaMatchScorer()
+    case = TestCase(id="c1", input="x", expected_output="{not valid json")
+
+    with pytest.raises(ValueError, match="expected_output to be valid JSON"):
+        scorer.score(case, _result('{"a": 1}'))
+
+
 def test_registry_looks_up_scorer_by_name():
     assert isinstance(get_scorer("exact_match"), ExactMatchScorer)
     assert isinstance(get_scorer("json_schema_match"), JsonSchemaMatchScorer)

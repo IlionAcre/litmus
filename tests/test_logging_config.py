@@ -127,3 +127,20 @@ def test_concurrent_logging_from_multiple_threads_produces_no_corrupt_lines(tmp_
         payload = json.loads(line)  # raises if any line got interleaved/corrupted
         seen.add((payload["thread_id"], payload["i"]))
     assert len(seen) == thread_count * logs_per_thread
+
+
+def test_configure_logging_degrades_gracefully_when_log_dir_cannot_be_created(tmp_path, capsys):
+    """Logging failures must never abort the actual run/compare/serve
+    operation - this proves the OSError fallback path actually works, not
+    just that the code reads that way."""
+    blocker = tmp_path / "blocker"
+    blocker.write_text("a file, not a directory - mkdir(parents=True) through this fails")
+    log_file = blocker / "sub" / "litmus.jsonl"
+
+    configure_logging(log_file, "INFO")  # must not raise
+
+    captured = capsys.readouterr()
+    assert "WARNING: could not set up log file" in captured.err
+
+    logger = logging.getLogger(LOGGER_NAME)
+    logger.info("must not crash even though no file handler exists")

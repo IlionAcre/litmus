@@ -17,3 +17,6 @@ AI_docs
 
 # Runtime logs
 logs/
+
+# Coverage artifacts
+.coverage

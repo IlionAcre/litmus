@@ -136,6 +136,7 @@ def compare_runs(
     min_case_count: int = 10,
     min_discordant_pairs: int = 10,
     exact_threshold: int = 25,
+    n_resamples: int = 10000,
 ) -> ComparisonReport:
     """Given a baseline and a candidate run (results + scores), align them by
     test_case_id and compute a statistically-grounded comparison report.
@@ -169,7 +170,9 @@ def compare_runs(
     discordant pairs it uses the exact binomial test instead of the
     chi-square approximation (see stats.py/CLAUDE.md). pass_rate.method
     reports which formula actually ran; it's None for the other three
-    metrics since they use the bootstrap, not McNemar's."""
+    metrics since they use the bootstrap, not McNemar's. n_resamples is
+    forwarded to every bootstrap_diff_ci() call (latency_ms/cost_usd/
+    mean_score)."""
     alignment = _align(
         baseline_results, baseline_scores, candidate_results, candidate_scores
     )
@@ -193,13 +196,13 @@ def compare_runs(
         baseline_passed, candidate_passed, alpha=alpha, exact_threshold=exact_threshold
     )
     latency_result = bootstrap_diff_ci(
-        baseline_latency, candidate_latency, confidence=confidence
+        baseline_latency, candidate_latency, n_resamples=n_resamples, confidence=confidence
     )
     cost_result = bootstrap_diff_ci(
-        baseline_cost, candidate_cost, confidence=confidence
+        baseline_cost, candidate_cost, n_resamples=n_resamples, confidence=confidence
     )
     score_result = bootstrap_diff_ci(
-        baseline_score, candidate_score, confidence=confidence
+        baseline_score, candidate_score, n_resamples=n_resamples, confidence=confidence
     )
 
     baseline_pass_rate = _mean([float(p) for p in baseline_passed])

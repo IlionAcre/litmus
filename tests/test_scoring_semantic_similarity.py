@@ -5,7 +5,7 @@ import pytest
 
 from litmus.schemas import RunResult, TestCase
 from litmus.scoring.registry import get_scorer
-from litmus.scoring.semantic_similarity import SemanticSimilarityScorer
+from litmus.scoring.semantic_similarity import SemanticSimilarityScorer, _cosine_similarity
 
 
 def _result(raw_output: str) -> RunResult:
@@ -67,3 +67,12 @@ def test_requires_expected_output():
 def test_registered_under_semantic_similarity(monkeypatch):
     scorer = get_scorer("semantic_similarity")
     assert isinstance(scorer, SemanticSimilarityScorer)
+
+
+def test_cosine_similarity_zero_norm_guard_does_not_divide_by_zero():
+    """A zero vector (norm 0) must return 0.0 similarity, not raise a
+    ZeroDivisionError - defensive code that's never actually been exercised
+    by a test before."""
+    assert _cosine_similarity([0.0, 0.0], [1.0, 0.0]) == 0.0
+    assert _cosine_similarity([1.0, 0.0], [0.0, 0.0]) == 0.0
+    assert _cosine_similarity([0.0, 0.0], [0.0, 0.0]) == 0.0

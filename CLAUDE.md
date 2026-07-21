@@ -455,9 +455,108 @@ are deprecated as of this writing and return a 404 — use the 2.5 line.
 The CI gate workflow (`eval-gate.yml`) and README quickstart were updated to
 reference `GEMINI_API_KEY`/`gemini/gemini-2.5-flash-lite` to match.
 
+## New decision: consolidated config via `[tool.litmus]` in `pyproject.toml`
+
+Every tunable value in Litmus was a scattered hardcoded default: 11
+`typer.Option` defaults across `cli.py`'s three commands, `DEFAULT_MODEL`/
+`DEFAULT_THRESHOLD` in two scorer modules, `bootstrap_diff_ci`/
+`mcnemar_test`'s numeric defaults, `logging_config.py`'s rotation settings,
+`storage.py`'s `DEFAULT_RUNS_DIR` — none overridable except by editing
+source or passing CLI flags one invocation at a time. New module
+`src/litmus/config.py`: `LitmusConfig` (frozen dataclass, one field per
+scattered value) + `load_config()`, reading `[tool.litmus]` from
+`pyproject.toml` via stdlib `tomllib` (no new dependency —
+`requires-python = ">=3.12"` guarantees it). Reuses the file that already
+holds `[tool.pytest.ini_options]` rather than inventing a new location.
+Precedence: **CLI flag > `[tool.litmus]` > hardcoded fallback**. A missing
+file/section/key all fall back gracefully — no override is ever required;
+the actual `pyproject.toml` ships this fully commented-out as documentation
+of every available key, not a live section.
+
+Config-file resolution is deliberately a CLI-layer concern only —
+`stats.py`/`compare.py`/the scorer classes keep their exact original
+function signatures and hardcoded defaults, staying pure and config-unaware.
+Only `cli.py` (every `typer.Option`'s default now reads `CONFIG.<field>`
+instead of a literal) and `scoring/registry.py` (`SemanticSimilarityScorer`/
+`LlmJudgeScorer` now constructed with `model=`/`threshold=` from `CONFIG`)
+touch the new module, translating resolved config into concrete arguments
+before calling the existing, untouched business logic — kept the blast
+radius small.
+
+`load_config()` validates range-constrained fields itself (`alpha`/
+`confidence` in `[0,1]`; `min_case_count`/`min_discordant_pairs`/
+`exact_threshold`/`n_resamples`/`max_workers`/`port` non-negative) and
+raises `ConfigError` naming `pyproject.toml`'s `[tool.litmus]` and the
+offending key directly. This was confirmed necessary, not just cautious:
+tested empirically that Typer/Click's own `min=`/`max=` option constraints
+*do* apply to a programmatically-supplied default the same as a
+user-supplied value (so a bad config value can't silently produce nonsense
+results either way) — but the resulting error message blames the CLI flag
+(`Invalid value for '--alpha'`) even when the user never touched that flag
+and the bad value came from the config file. Typer's constraint stays as a
+safety net; `config.py`'s validation is the actual, accurate error surface.
+
+`compare_runs()`/`mcnemar_test()`'s `n_resamples`/threshold values were
+already real function parameters but had no CLI exposure at all before this
+— added `--n-resamples` on `compare` for genuine completeness, matching the
+pattern of the other five threshold options added in the prior review pass.
+
+## New decision: concurrency for `litmus run` via `ThreadPoolExecutor`
+
+`litmus run` processed test cases strictly sequentially — one blocking LLM
+call at a time, confirmed by reading `_run_and_score` directly. Confirmed no
+case depends on any other case (each is a pure, independent per-case
+pipeline). The per-case logic (both try/except blocks) was extracted into
+`_process_case(case, target) -> tuple[RunResult, ScoreResult]`, which never
+raises (both exception paths already convert failures into sentinel error
+results) — this property is what makes it safe to run inside a thread pool
+with no extra exception plumbing. `_run_and_score(cases, target,
+max_workers=...)`: sequential `for` loop when `max_workers<=1` (identical to
+the original code, zero new risk on that path); otherwise
+`ThreadPoolExecutor(max_workers=...).map(...)`, which returns results in
+*input* order regardless of completion order, so results/scores come back
+correctly aligned with no manual reordering needed.
+
+**`ThreadPoolExecutor` chosen over `asyncio`/`litellm.acompletion`**
+specifically because every existing test mocks the *synchronous*
+`litellm.completion` directly via `monkeypatch.setattr` — confirmed the
+installed `litellm==1.89.6` genuinely exposes `acompletion`/`aembedding`,
+but switching to them would have forced every existing test's mock to
+become async-compatible. A thread pool around the existing synchronous call
+chain gets the concurrency without touching `llm.py`, `runner.py`, or a
+single existing test's mocking convention.
+
+New `LitmusConfig.max_workers` field, hardcoded fallback **4** — a genuine
+default improvement (not just an opt-in flag nobody finds), sized modestly
+to reduce real-world provider rate-limit exposure rather than maximize raw
+throughput. New `--max-workers` option on `run` (`min=1`). Manually verified
+with a real timing comparison (24 simulated-latency cases): **4.25x speedup**
+at `max_workers=4` vs. `max_workers=1`, with byte-for-byte identical
+per-case ordering and pass/fail results between the two — concurrency is a
+performance change only, never a behavior change.
+
+Two thread-safety subtleties were checked empirically, not assumed, during
+planning:
+- The shared `SCORERS` singleton instances only hold read-only
+  `self.model`/`self.threshold` set at construction, never mutated during
+  `.score()` — safe to call concurrently with no locking.
+- `monkeypatch.setattr("module.attr", ...)` mutates the actual module
+  object in memory, shared process-wide regardless of thread — confirmed
+  via a throwaway test that a monkeypatched function called from inside a
+  `ThreadPoolExecutor` worker is genuinely the patched version.
+- **Caveat that matters for any future test in this area:**
+  `_pin_deterministic_timing`'s shared `itertools.count()` is thread-safe
+  for *uniqueness* (no duplicates/races across concurrent `next()` calls,
+  confirmed) but is **not** deterministic *per-case* once workers
+  interleave — a sequential run gives every case the exact same latency by
+  construction; a concurrent run gives varying, non-reproducible values
+  (other threads' `next()` calls land between a given case's own
+  start/end pair). Never assert on specific `latency_ms` values in a
+  concurrency test — assert on ordering/content/pass-fail parity instead.
+
 ## Status
 
-All 16 checkpoints complete (86 tests passing). Full pipeline built and
+All 16 checkpoints complete (125 tests passing). Full pipeline built and
 tested: schema, loader, runner, real litellm execution, the `litmus
 run`/`litmus compare`/`litmus serve` CLI commands, all three scorers,
 McNemar's + paired-bootstrap statistical tests, DuckDB-backed trend queries,

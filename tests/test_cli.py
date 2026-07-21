@@ -1,3 +1,4 @@
+import importlib
 import json
 from itertools import count
 from pathlib import Path
@@ -5,6 +6,7 @@ from unittest.mock import MagicMock
 
 from typer.testing import CliRunner
 
+import litmus.cli as cli_module
 from litmus.cli import app
 
 runner = CliRunner()
@@ -364,3 +366,171 @@ def test_litmus_compare_reports_no_regression_when_both_targets_agree(monkeypatc
 
     assert result.exit_code == 0
     assert "no significant regression" in result.stdout
+
+
+def test_litmus_run_concurrent_execution_matches_sequential_results(monkeypatch, tmp_path):
+    """ThreadPoolExecutor.map() must preserve input order and produce the
+    same per-case results as strictly sequential execution - concurrency is
+    a performance change only, never a behavior change. Does NOT assert on
+    latency_ms: _pin_deterministic_timing's shared itertools.count() is
+    thread-safe for uniqueness but not deterministic per-case once workers
+    interleave (verified empirically during planning - a sequential run
+    gives every case the exact same latency by construction, a concurrent
+    run gives varying, non-reproducible values), so this only asserts on
+    ordering/content/pass-fail parity, per the plan's explicit instruction."""
+    testset_dir = _write_synthetic_testset(tmp_path, n_positive=8, n_negative=8)
+
+    def fake_completion(model, messages):
+        content = "positive" if "great" in messages[0]["content"] else "negative"
+        return _fake_response(content)
+
+    monkeypatch.setattr("litellm.completion", fake_completion)
+    monkeypatch.setattr("litellm.completion_cost", lambda completion_response: 0.0001)
+
+    sequential_runs_dir = tmp_path / "sequential"
+    concurrent_runs_dir = tmp_path / "concurrent"
+
+    sequential_result = runner.invoke(
+        app,
+        [
+            "run", str(testset_dir), "--model", "m",
+            "--runs-dir", str(sequential_runs_dir), "--max-workers", "1",
+        ],
+    )
+    concurrent_result = runner.invoke(
+        app,
+        [
+            "run", str(testset_dir), "--model", "m",
+            "--runs-dir", str(concurrent_runs_dir), "--max-workers", "4",
+        ],
+    )
+
+    assert sequential_result.exit_code == 0
+    assert concurrent_result.exit_code == 0
+
+    sequential_saved = json.loads(next(sequential_runs_dir.glob("*.json")).read_text())
+    concurrent_saved = json.loads(next(concurrent_runs_dir.glob("*.json")).read_text())
+
+    sequential_ids = [r["test_case_id"] for r in sequential_saved["results"]]
+    concurrent_ids = [r["test_case_id"] for r in concurrent_saved["results"]]
+    assert sequential_ids == concurrent_ids
+
+    sequential_pass = {s["test_case_id"]: s["passed"] for s in sequential_saved["scores"]}
+    concurrent_pass = {s["test_case_id"]: s["passed"] for s in concurrent_saved["scores"]}
+    assert sequential_pass == concurrent_pass
+
+
+def test_litmus_run_isolates_a_scoring_failure_keeping_the_real_llm_result(monkeypatch, tmp_path):
+    """Distinct from the LLM-call-failure test: here the LLM call succeeds
+    (a real RunResult with real output/latency/cost) and only scoring itself
+    blows up - the persisted RunResult must stay the real one, not a zeroed
+    sentinel, while only the ScoreResult becomes an error placeholder."""
+    testset_dir = tmp_path / "testset"
+    testset_dir.mkdir()
+    # No expected_output -> ExactMatchScorer.score() raises ValueError.
+    (testset_dir / "no_expected.json").write_text(
+        '{"id": "no_expected", "input": "whatever"}'
+    )
+
+    monkeypatch.setattr(
+        "litellm.completion",
+        lambda model, messages: _fake_response("a real llm answer"),
+    )
+    monkeypatch.setattr("litellm.completion_cost", lambda completion_response: 0.0002)
+
+    result = runner.invoke(
+        app,
+        ["run", str(testset_dir), "--model", "m", "--runs-dir", str(tmp_path / "runs")],
+    )
+
+    assert result.exit_code == 0
+    assert "[ERROR] no_expected" in result.stdout
+
+    saved = json.loads(next((tmp_path / "runs").glob("*.json")).read_text())
+    saved_result = next(r for r in saved["results"] if r["test_case_id"] == "no_expected")
+    saved_score = next(s for s in saved["scores"] if s["test_case_id"] == "no_expected")
+
+    assert saved_result["error"] is None
+    assert saved_result["raw_output"] == "a real llm answer"
+    assert saved_result["cost_usd"] == 0.0002
+    assert saved_score["error"] is not None
+    assert "expected_output" in saved_score["error"]
+    assert saved_score["passed"] is False
+
+
+def test_litmus_compare_prints_mismatch_warning_with_excluded_ids(monkeypatch, tmp_path):
+    baseline_dir = tmp_path / "baseline_testset"
+    candidate_dir = tmp_path / "candidate_testset"
+    baseline_dir.mkdir()
+    candidate_dir.mkdir()
+
+    # shared: case_a, case_b. baseline-only: case_c. candidate-only: case_d.
+    for name in ("case_a", "case_b", "case_c"):
+        (baseline_dir / f"{name}.json").write_text(
+            f'{{"id": "{name}", "input": "x", "expected_output": "positive"}}'
+        )
+    for name in ("case_a", "case_b", "case_d"):
+        (candidate_dir / f"{name}.json").write_text(
+            f'{{"id": "{name}", "input": "x", "expected_output": "positive"}}'
+        )
+
+    monkeypatch.setattr(
+        "litellm.completion", lambda model, messages: _fake_response("positive")
+    )
+    monkeypatch.setattr("litellm.completion_cost", lambda completion_response: 0.0001)
+
+    runs_dir = tmp_path / "runs"
+    baseline_id = _run(baseline_dir, "m", runs_dir)
+    candidate_id = _run(candidate_dir, "m", runs_dir)
+
+    result = runner.invoke(
+        app,
+        ["compare", baseline_id, candidate_id, "--runs-dir", str(runs_dir)],
+    )
+
+    assert "WARNING: comparing 2 common test case(s)." in result.stdout
+    assert "1 only in baseline (excluded): case_c" in result.stdout
+    assert "1 only in candidate (excluded): case_d" in result.stdout
+
+
+def test_litmus_compare_picks_up_pyproject_toml_override_without_a_cli_flag(monkeypatch, tmp_path):
+    """Config-file precedence must actually work end-to-end: CLI flag >
+    [tool.litmus] in pyproject.toml > hardcoded fallback. Complements
+    test_litmus_compare_min_case_count_option_changes_power_warning (which
+    covers the CLI-flag layer) by proving the pyproject.toml layer.
+    typer.Option's default is evaluated once at module-import time from
+    CONFIG, so exercising a config-file override requires actually reloading
+    cli.py against a fake project directory, not just monkeypatching
+    cli.CONFIG after the fact (that wouldn't touch the already-baked-in
+    Option defaults)."""
+    testset_dir = _write_synthetic_testset(tmp_path, n_positive=1, n_negative=1)
+    runs_dir = tmp_path / "runs"
+
+    monkeypatch.setattr(
+        "litellm.completion", lambda model, messages: _fake_response("positive")
+    )
+    monkeypatch.setattr("litellm.completion_cost", lambda completion_response: 0.0001)
+    _pin_deterministic_timing(monkeypatch)
+
+    baseline_id = _run(testset_dir, "same-model", runs_dir)
+    candidate_id = _run(testset_dir, "same-model", runs_dir)
+
+    (tmp_path / "pyproject.toml").write_text(
+        "[tool.litmus]\nmin_case_count = 1\nmin_discordant_pairs = 0\n"
+    )
+    original_cwd = Path.cwd()
+    try:
+        monkeypatch.chdir(tmp_path)
+        importlib.reload(cli_module)
+        result = CliRunner().invoke(
+            cli_module.app,
+            ["compare", baseline_id, candidate_id, "--runs-dir", str(runs_dir)],
+        )
+    finally:
+        # Restore cli_module's CONFIG/app to reflect the real project
+        # directory before this test ends, regardless of pass/fail -
+        # module reloads aren't undone by monkeypatch's own teardown.
+        monkeypatch.chdir(original_cwd)
+        importlib.reload(cli_module)
+
+    assert "NOTE: low statistical power" not in result.stdout

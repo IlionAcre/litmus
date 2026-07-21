@@ -1,5 +1,6 @@
 import logging
 import os
+from concurrent.futures import ThreadPoolExecutor
 from datetime import UTC, datetime
 from pathlib import Path
 
@@ -7,15 +8,17 @@ import typer
 from dotenv import load_dotenv
 
 from litmus.compare import compare_runs
+from litmus.config import load_config
 from litmus.llm import litellm_call
 from litmus.loader import TestCaseLoadError, load_test_cases
 from litmus.logging_config import LOGGER_NAME, configure_logging
 from litmus.runner import run_test_case
 from litmus.schemas import RunResult, RunTarget, ScoreResult, TestCase
 from litmus.scoring.registry import get_scorer
-from litmus.storage import DEFAULT_RUNS_DIR, load_run, save_run
+from litmus.storage import load_run, save_run
 
 load_dotenv()
+CONFIG = load_config()
 
 app = typer.Typer()
 logger = logging.getLogger(LOGGER_NAME)
@@ -24,70 +27,92 @@ logger = logging.getLogger(LOGGER_NAME)
 @app.callback()
 def main(
     log_file: Path = typer.Option(
-        Path("logs/litmus.jsonl"),
+        CONFIG.log_file,
         "--log-file",
         envvar="LITMUS_LOG_FILE",
         help="Structured JSON-lines log file path",
     ),
     log_level: str = typer.Option(
-        "INFO", "--log-level", envvar="LITMUS_LOG_LEVEL", help="Logging level"
+        CONFIG.log_level, "--log-level", envvar="LITMUS_LOG_LEVEL", help="Logging level"
     ),
 ) -> None:
     """Litmus: an LLM evaluation and regression-testing tool."""
-    configure_logging(log_file, log_level)
+    configure_logging(
+        log_file, log_level, max_bytes=CONFIG.log_max_bytes, backup_count=CONFIG.log_backup_count
+    )
+
+
+def _process_case(case: TestCase, target: RunTarget) -> tuple[RunResult, ScoreResult]:
+    """Run and score a single case, isolating failures: a case's LLM call or
+    scoring blowing up (rate limit, bad model name, auth failure, an
+    unparseable judge response, ...) must not lose every already-computed
+    result in the batch. A failed case is recorded with `error` set (see
+    RunResult/ScoreResult) instead of crashing the run.
+
+    Never raises - both exception paths below convert a failure into a
+    sentinel error result instead of propagating. This property is load-
+    bearing: it's what makes this function safe to call from inside a
+    ThreadPoolExecutor worker with no extra exception plumbing (see
+    _run_and_score)."""
+    try:
+        result = run_test_case(case, target, litellm_call)
+    except Exception as e:  # noqa: BLE001 - deliberately broad, see docstring
+        error_msg = f"{type(e).__name__}: {e}"
+        result = RunResult(
+            test_case_id=case.id,
+            raw_output="",
+            latency_ms=0.0,
+            cost_usd=0.0,
+            timestamp=datetime.now(UTC),
+            error=error_msg,
+        )
+        score_result = ScoreResult(
+            test_case_id=case.id,
+            passed=False,
+            score=0.0,
+            explanation="not scored: the run itself failed",
+            error=error_msg,
+        )
+        return result, score_result
+
+    try:
+        scorer = get_scorer(case.scorer)
+        score_result = scorer.score(case, result)
+    except Exception as e:  # noqa: BLE001 - deliberately broad, see docstring
+        error_msg = f"{type(e).__name__}: {e}"
+        score_result = ScoreResult(
+            test_case_id=case.id,
+            passed=False,
+            score=0.0,
+            explanation="scoring failed",
+            error=error_msg,
+        )
+
+    return result, score_result
 
 
 def _run_and_score(
-    cases: list[TestCase], target: RunTarget
+    cases: list[TestCase], target: RunTarget, max_workers: int = 1
 ) -> tuple[list[RunResult], list[ScoreResult]]:
-    """Run and score every case, isolating failures per-case: a single
-    case's LLM call or scoring blowing up (rate limit, bad model name, auth
-    failure, an unparseable judge response, ...) must not lose every
-    already-computed result in the batch. A failed case is recorded with
-    `error` set (see RunResult/ScoreResult) instead of crashing the run."""
-    results = []
-    scores = []
-    for case in cases:
-        try:
-            result = run_test_case(case, target, litellm_call)
-        except Exception as e:  # noqa: BLE001 - deliberately broad, see docstring
-            error_msg = f"{type(e).__name__}: {e}"
-            results.append(
-                RunResult(
-                    test_case_id=case.id,
-                    raw_output="",
-                    latency_ms=0.0,
-                    cost_usd=0.0,
-                    timestamp=datetime.now(UTC),
-                    error=error_msg,
-                )
-            )
-            scores.append(
-                ScoreResult(
-                    test_case_id=case.id,
-                    passed=False,
-                    score=0.0,
-                    explanation="not scored: the run itself failed",
-                    error=error_msg,
-                )
-            )
-            continue
+    """Run and score every case. Sequential when max_workers<=1 (identical
+    to the original implementation, zero new risk on the default-untouched
+    path). Concurrent otherwise: cases are fully independent (no case's
+    result depends on another's), and ThreadPoolExecutor.map() returns
+    results in *input* order regardless of completion order, so results/
+    scores come back correctly aligned with `cases` with no manual
+    reordering needed. A ThreadPoolExecutor (not asyncio) was chosen
+    specifically so litellm_call/the scorers keep calling litellm's
+    synchronous API - every existing test mocks litellm.completion directly,
+    and an async rewrite would have forced every one of those mocks to
+    become async-compatible (see CLAUDE.md)."""
+    if max_workers <= 1:
+        pairs = [_process_case(case, target) for case in cases]
+    else:
+        with ThreadPoolExecutor(max_workers=max_workers) as executor:
+            pairs = list(executor.map(lambda case: _process_case(case, target), cases))
 
-        try:
-            scorer = get_scorer(case.scorer)
-            score_result = scorer.score(case, result)
-        except Exception as e:  # noqa: BLE001 - deliberately broad, see docstring
-            error_msg = f"{type(e).__name__}: {e}"
-            score_result = ScoreResult(
-                test_case_id=case.id,
-                passed=False,
-                score=0.0,
-                explanation="scoring failed",
-                error=error_msg,
-            )
-
-        results.append(result)
-        scores.append(score_result)
+    results = [result for result, _ in pairs]
+    scores = [score_result for _, score_result in pairs]
     return results, scores
 
 
@@ -99,7 +124,13 @@ def run(
         "v1", "--prompt-version", help="Prompt version label for this run"
     ),
     runs_dir: Path = typer.Option(
-        DEFAULT_RUNS_DIR, "--runs-dir", help="Directory to persist this run's results in"
+        CONFIG.runs_dir, "--runs-dir", help="Directory to persist this run's results in"
+    ),
+    max_workers: int = typer.Option(
+        CONFIG.max_workers,
+        "--max-workers",
+        min=1,
+        help="Number of test cases to run concurrently",
     ),
 ) -> None:
     """Run a test set against a model, print each result, and persist the
@@ -131,7 +162,7 @@ def run(
             "case_count": len(cases),
         },
     )
-    results, scores = _run_and_score(cases, target)
+    results, scores = _run_and_score(cases, target, max_workers=max_workers)
 
     for result, score_result in zip(results, scores, strict=True):
         if result.error or score_result.error:
@@ -192,40 +223,46 @@ def compare(
     baseline_run_id: str = typer.Argument(...),
     candidate_run_id: str = typer.Argument(...),
     runs_dir: Path = typer.Option(
-        DEFAULT_RUNS_DIR, "--runs-dir", help="Directory persisted runs are read from"
+        CONFIG.runs_dir, "--runs-dir", help="Directory persisted runs are read from"
     ),
     alpha: float = typer.Option(
-        0.05,
+        CONFIG.alpha,
         "--alpha",
         min=0.0,
         max=1.0,
         help="Significance level for McNemar's test (pass_rate)",
     ),
     confidence: float = typer.Option(
-        0.95,
+        CONFIG.confidence,
         "--confidence",
         min=0.0,
         max=1.0,
         help="Confidence level for the bootstrap CIs",
     ),
     min_case_count: int = typer.Option(
-        10,
+        CONFIG.min_case_count,
         "--min-case-count",
         min=0,
         help="power_warning threshold: minimum common test cases expected",
     ),
     min_discordant_pairs: int = typer.Option(
-        10,
+        CONFIG.min_discordant_pairs,
         "--min-discordant-pairs",
         min=0,
         help="power_warning threshold: minimum McNemar discordant pairs expected",
     ),
     exact_threshold: int = typer.Option(
-        25,
+        CONFIG.exact_threshold,
         "--exact-threshold",
         min=0,
         help="Below this many discordant pairs, use the exact binomial test "
         "instead of the chi-square approximation for pass_rate",
+    ),
+    n_resamples: int = typer.Option(
+        CONFIG.n_resamples,
+        "--n-resamples",
+        min=1,
+        help="Number of bootstrap resamples for latency_ms/cost_usd/mean_score CIs",
     ),
 ) -> None:
     """Compare two already-persisted runs and print a statistically-grounded
@@ -251,6 +288,7 @@ def compare(
         min_case_count=min_case_count,
         min_discordant_pairs=min_discordant_pairs,
         exact_threshold=exact_threshold,
+        n_resamples=n_resamples,
     )
     logger.info(
         "comparison performed",
@@ -328,10 +366,10 @@ def compare(
 
 @app.command()
 def serve(
-    host: str = typer.Option("127.0.0.1", "--host"),
-    port: int = typer.Option(8000, "--port"),
+    host: str = typer.Option(CONFIG.host, "--host"),
+    port: int = typer.Option(CONFIG.port, "--port"),
     runs_dir: Path = typer.Option(
-        DEFAULT_RUNS_DIR, "--runs-dir", help="Directory persisted runs are read from"
+        CONFIG.runs_dir, "--runs-dir", help="Directory persisted runs are read from"
     ),
 ) -> None:
     """Launch the local dashboard (FastAPI, reads persisted runs via DuckDB)."""
