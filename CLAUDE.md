@@ -259,6 +259,47 @@ the project or change the tagline without the user explicitly asking.
     preserves a genuine independent cross-check on the chi-square path
     (exact p~=0.03570 vs. chi-square p~=0.03764 — close, not identical,
     both agree on significance).
+  - Follow-up review pass caught two more real gaps in this same feature,
+    both now fixed:
+    1. **`McNemarResult.method` never actually reached any output** — it was
+       computed correctly but discarded before reaching `MetricComparison`
+       (which had no `method` field at all), so a user had no way to tell
+       which formula produced a given `pass_rate` p-value. Fixed: added
+       `method: str | None = None` to `MetricComparison` (only meaningful
+       for `pass_rate`; `None` for the bootstrap-based metrics), threaded
+       through in `compare_runs()`, printed in `cli.py` as a suffix on the
+       `p=...` line (e.g. `p=0.0386 (exact_binomial)`). Reaches the API for
+       free via `_report_dict()`'s existing `asdict(report.pass_rate)`.
+    2. **Every comparison threshold was unreachable from the CLI.** `alpha`,
+       `confidence`, `min_case_count`, `min_discordant_pairs` were real
+       `compare_runs()` parameters nobody could actually override without
+       calling the Python API directly, and `compare_runs()` didn't even
+       have an `exact_threshold` parameter to forward to `mcnemar_test()`.
+       Fixed: added `exact_threshold: int = 25` to `compare_runs()`, and
+       exposed all five as `litmus compare` options (`--alpha`,
+       `--confidence`, `--min-case-count`, `--min-discordant-pairs`,
+       `--exact-threshold`), documented in `README.md`'s "CLI reference"
+       section.
+  - **A live smoke test uncovered a real, separate bug** in the judge
+    confidence-score feature above: Gemini routinely wraps its JSON response
+    in a markdown code fence (```` ```json ... ``` ````) even when the
+    prompt says "respond with ONLY a JSON object" — `json.loads` can't parse
+    that, so **every real judge call would have failed** with
+    `JudgeParseError` regardless of how well-calibrated the actual score
+    was. No existing test caught this because all of them mock
+    `litellm.completion` with hand-crafted clean JSON strings, never real
+    model output quirks. Fixed with a `_strip_markdown_code_fence()` helper
+    applied before `json.loads`. Once fixed, the actual calibration question
+    (was this whole feature worth it, or does an LLM judge just cluster at
+    0.0/0.5/1.0 when asked to self-report confidence?) was tested for real
+    against `gemini/gemini-2.5-flash-lite` — a fixed customer-service rubric
+    against 6 outputs spanning clearly-satisfying to clearly-failing,
+    including 4 deliberately borderline/partial ones. Real scores returned:
+    `1.0, 0.0, 0.3, 0.4, 0.4, 0.6` — genuine gradation, not clustering at the
+    extremes, and the rationale text correctly tracked which specific
+    rubric criteria each partial case missed. Conclusion: the judge
+    confidence score works as intended in practice, not just in code; no
+    prompt revision was needed.
 
 ## Known gotcha: real wall-clock timing in tests is flaky
 

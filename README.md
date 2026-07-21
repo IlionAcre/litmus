@@ -40,13 +40,22 @@ uv run litmus serve
 - **Runner** — executes each test case against a target (prompt version + model),
   capturing output, token cost, and latency.
 - **Scorer** — pluggable strategies per test case: exact/schema match, semantic
-  similarity (embeddings), and LLM-as-judge against a rubric. Pluggability is the
-  differentiator over a naive string-diff eval.
+  similarity (embeddings, cosine similarity thresholded into pass/fail), and
+  LLM-as-judge against a rubric (the judge returns a continuous confidence
+  score 0.0-1.0, also thresholded — not just a bare boolean verdict).
+  Pluggability is the differentiator over a naive string-diff eval.
 - **Comparison engine** — given a baseline run and a candidate run, computes
-  per-metric deltas with real significance testing: McNemar's test for
-  pass/fail rates, a paired bootstrap CI for latency/cost (both are paired,
-  same-test-case-before/after data, not independent samples) — rather than
-  eyeballing percentages.
+  four per-metric deltas with real significance testing: McNemar's test for
+  pass/fail rates (exact binomial test below a small discordant-pair count,
+  chi-square approximation above it — `pass_rate.method` reports which one
+  ran), and a paired bootstrap CI for latency, cost, and mean score (all
+  paired, same-test-case-before/after data, not independent samples) —
+  rather than eyeballing percentages. `mean_score` catches a model quietly
+  getting less confident/similar before enough cases flip to move the pass
+  rate. A `power_warning` flags when there are too few test cases or too few
+  discordant pairs for the statistics to be trustworthy. All of `alpha`,
+  `confidence`, `min_case_count`, `min_discordant_pairs`, and
+  `exact_threshold` are configurable via `litmus compare` options.
 - **History store** — every run persisted with timestamp + prompt/model version,
   so trendlines are possible, not just single comparisons.
 - **CI gate** — a GitHub Action that runs the suite on a PR touching prompts/model
@@ -178,6 +187,18 @@ shrinking the sample.
 6. ✅ Dashboard (JSON API — comparison, trends, per-run drill-down)
 7. ✅ README case study: a real caught regression with a real p-value (above)
 
+## CLI reference (comparison thresholds)
+
+`litmus compare <baseline_run_id> <candidate_run_id>` accepts:
+
+- `--alpha` (default `0.05`) — significance level for McNemar's test
+- `--confidence` (default `0.95`) — confidence level for the bootstrap CIs
+- `--min-case-count` / `--min-discordant-pairs` (both default `10`) —
+  `power_warning` thresholds
+- `--exact-threshold` (default `25`) — below this many discordant pairs,
+  `pass_rate` uses the exact binomial test instead of the chi-square
+  approximation
+
 ## CI gate setup
 
 `.github/workflows/eval-gate.yml` runs on any PR touching `testsets/**` or
@@ -195,18 +216,19 @@ persisted runs yet, the gate is skipped (nothing to compare against).
 
 ## Status
 
-All 10 milestones complete (86 tests passing, all offline/mocked except the
+All 10 milestones complete (103 tests passing, all offline/mocked except the
 real Gemini calls behind the case study above): schema, loader, runner, real
 `litellm` execution, the `litmus run`/`litmus compare`/`litmus serve` CLI,
-all three scorers, both statistical tests (McNemar's for pass/fail, paired
-bootstrap for latency/cost), DuckDB-backed trend queries, the CI gate
-workflow (built and locally validated — not yet exercised against a live
-PR), the FastAPI dashboard, structured JSON-lines logging (see Observability
-above), and the case study above. A single test case's
-LLM/scoring failure is isolated (recorded as `[ERROR]`, doesn't lose the
-rest of the batch); mismatched or errored test cases between two runs being
-compared are excluded from the statistics but always surfaced explicitly,
-never silently dropped.
+all three scorers (including the judge's continuous confidence score), four
+comparison metrics (`pass_rate`, `latency_ms`, `cost_usd`, `mean_score`) with
+real significance testing and a `power_warning` for low-data comparisons,
+DuckDB-backed trend queries, the CI gate workflow (built and locally
+validated — not yet exercised against a live PR), the FastAPI dashboard,
+structured JSON-lines logging (see Observability above), and the case study
+above. A single test case's LLM/scoring failure is isolated (recorded as
+`[ERROR]`, doesn't lose the rest of the batch); mismatched or errored test
+cases between two runs being compared are excluded from the statistics but
+always surfaced explicitly, never silently dropped.
 
 Not yet built: a rendered frontend for the dashboard (it's a JSON API today)
 and a hosted/deployed version — both explicitly out of scope for now, see

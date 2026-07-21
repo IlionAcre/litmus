@@ -35,6 +35,23 @@ class JudgeParseError(Exception):
     """
 
 
+def _strip_markdown_code_fence(text: str) -> str:
+    """Gemini (and other models) routinely wrap JSON output in a markdown
+    code fence (```json ... ```) even when explicitly told to respond with
+    ONLY the JSON object - confirmed via a live call, not assumed. Stripping
+    this is not optional cleanup: without it, every real judge call fails to
+    parse regardless of how well-formed or calibrated the actual score is."""
+    stripped = text.strip()
+    if not stripped.startswith("```"):
+        return stripped
+    lines = stripped.splitlines()
+    if lines and lines[0].startswith("```"):
+        lines = lines[1:]
+    if lines and lines[-1].strip() == "```":
+        lines = lines[:-1]
+    return "\n".join(lines).strip()
+
+
 class LlmJudgeScorer:
     """Rubric-based grading via an LLM judge, for cases a plain similarity
     score can't capture. Mirrors SemanticSimilarityScorer's pattern: the
@@ -60,7 +77,7 @@ class LlmJudgeScorer:
         raw_verdict = response.choices[0].message.content
 
         try:
-            data = json.loads(raw_verdict)
+            data = json.loads(_strip_markdown_code_fence(raw_verdict))
             verdict = _JudgeVerdict(**data)
         except (json.JSONDecodeError, ValidationError, TypeError) as e:
             raise JudgeParseError(

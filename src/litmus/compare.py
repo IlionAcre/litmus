@@ -17,6 +17,10 @@ class MetricComparison:
     p_value: float | None = None
     ci_low: float | None = None
     ci_high: float | None = None
+    # Only meaningful for pass_rate (McNemar's) - which formula actually
+    # produced p_value: "exact_binomial" / "chi_square" / "no_discordant_pairs".
+    # None for latency_ms/cost_usd/mean_score, which use the bootstrap.
+    method: str | None = None
 
 
 @dataclass
@@ -131,6 +135,7 @@ def compare_runs(
     confidence: float = 0.95,
     min_case_count: int = 10,
     min_discordant_pairs: int = 10,
+    exact_threshold: int = 25,
 ) -> ComparisonReport:
     """Given a baseline and a candidate run (results + scores), align them by
     test_case_id and compute a statistically-grounded comparison report.
@@ -158,7 +163,13 @@ def compare_runs(
     signals that this comparison may not have enough data for its own
     statistics to be trustworthy. This is a heuristic threshold, not a
     formal statistical power calculation (that would require assuming a
-    target effect size, which nothing here does)."""
+    target effect size, which nothing here does).
+
+    exact_threshold is forwarded to mcnemar_test() - below that many
+    discordant pairs it uses the exact binomial test instead of the
+    chi-square approximation (see stats.py/CLAUDE.md). pass_rate.method
+    reports which formula actually ran; it's None for the other three
+    metrics since they use the bootstrap, not McNemar's."""
     alignment = _align(
         baseline_results, baseline_scores, candidate_results, candidate_scores
     )
@@ -178,7 +189,9 @@ def compare_runs(
     baseline_score = [bs.score for _, bs, _, _ in aligned]
     candidate_score = [cs.score for _, _, _, cs in aligned]
 
-    mcnemar_result = mcnemar_test(baseline_passed, candidate_passed, alpha=alpha)
+    mcnemar_result = mcnemar_test(
+        baseline_passed, candidate_passed, alpha=alpha, exact_threshold=exact_threshold
+    )
     latency_result = bootstrap_diff_ci(
         baseline_latency, candidate_latency, confidence=confidence
     )
@@ -219,6 +232,7 @@ def compare_runs(
             candidate_mean=candidate_pass_rate,
             delta=candidate_pass_rate - baseline_pass_rate,
             p_value=mcnemar_result.p_value,
+            method=mcnemar_result.method,
             # A regression means pass rate got worse, not just "changed".
             flagged=mcnemar_result.significant
             and candidate_pass_rate < baseline_pass_rate,

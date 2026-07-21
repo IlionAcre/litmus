@@ -94,6 +94,43 @@ def test_judge_respects_non_default_threshold(monkeypatch):
     assert score_result.score == 0.7
 
 
+def test_judge_strips_markdown_code_fence_before_parsing(monkeypatch):
+    """Gemini routinely wraps JSON output in a ```json ... ``` code fence
+    even when told to respond with ONLY the JSON object - confirmed via a
+    live call. Without stripping this, every real judge call fails to parse
+    regardless of how well-formed the actual verdict is."""
+    scorer = LlmJudgeScorer()
+    case = TestCase(id="c1", input="x", rubric="Must be polite.")
+
+    monkeypatch.setattr(
+        "litellm.completion",
+        lambda model, messages: _fake_response(
+            '```json\n{"score": 0.8, "rationale": "quite polite"}\n```'
+        ),
+    )
+
+    score_result = scorer.score(case, _result("Sure thing."))
+
+    assert score_result.score == 0.8
+    assert score_result.passed is True
+
+
+def test_judge_strips_bare_code_fence_without_language_tag(monkeypatch):
+    scorer = LlmJudgeScorer()
+    case = TestCase(id="c1", input="x", rubric="Must be polite.")
+
+    monkeypatch.setattr(
+        "litellm.completion",
+        lambda model, messages: _fake_response(
+            '```\n{"score": 0.2, "rationale": "not polite"}\n```'
+        ),
+    )
+
+    score_result = scorer.score(case, _result("Sure thing."))
+
+    assert score_result.score == 0.2
+
+
 def test_judge_raises_clear_error_on_unparseable_response(monkeypatch):
     """A judge that returns garbage must fail loudly, not be silently
     coerced into a pass/fail."""

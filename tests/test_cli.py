@@ -172,6 +172,44 @@ def test_litmus_compare_detects_a_regression(monkeypatch, tmp_path):
 
     assert result.exit_code == 1
     assert "REGRESSION DETECTED" in result.stdout
+    assert "(exact_binomial)" in result.stdout or "(chi_square)" in result.stdout
+
+
+def test_litmus_compare_min_case_count_option_changes_power_warning(monkeypatch, tmp_path):
+    """The comparison thresholds must actually be reachable from the CLI,
+    not just exist as compare_runs() parameters nobody can override."""
+    testset_dir = _write_synthetic_testset(tmp_path, n_positive=1, n_negative=1)
+    runs_dir = tmp_path / "runs"
+
+    monkeypatch.setattr(
+        "litellm.completion", lambda model, messages: _fake_response("positive")
+    )
+    monkeypatch.setattr("litellm.completion_cost", lambda completion_response: 0.0001)
+    _pin_deterministic_timing(monkeypatch)
+
+    baseline_id = _run(testset_dir, "same-model", runs_dir)
+    candidate_id = _run(testset_dir, "same-model", runs_dir)
+
+    default_result = runner.invoke(
+        app, ["compare", baseline_id, candidate_id, "--runs-dir", str(runs_dir)]
+    )
+    assert "NOTE: low statistical power" in default_result.stdout
+
+    overridden_result = runner.invoke(
+        app,
+        [
+            "compare",
+            baseline_id,
+            candidate_id,
+            "--runs-dir",
+            str(runs_dir),
+            "--min-case-count",
+            "1",
+            "--min-discordant-pairs",
+            "0",
+        ],
+    )
+    assert "NOTE: low statistical power" not in overridden_result.stdout
 
 
 def test_litmus_run_logs_structured_events(monkeypatch, tmp_path):

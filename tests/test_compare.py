@@ -312,3 +312,70 @@ def test_power_warning_none_for_a_normal_sized_testset_with_enough_discordant_pa
     )
 
     assert report.power_warning is None
+
+
+def test_pass_rate_method_is_threaded_through_from_mcnemar_result():
+    """McNemarResult.method must actually reach the report - it was
+    previously computed but discarded before reaching MetricComparison."""
+    ids = [f"c{i}" for i in range(20)]
+    baseline_passed = [True] * 18 + [False] * 2
+    candidate_passed = [False] * 10 + [True] * 10  # b=10, c=2, b+c=12 < default exact_threshold=25
+
+    baseline_results = _results(ids, latency=100.0, cost=0.001)
+    candidate_results = _results(ids, latency=100.0, cost=0.001)
+
+    report = compare_runs(
+        baseline_results,
+        _scores(ids, baseline_passed),
+        candidate_results,
+        _scores(ids, candidate_passed),
+    )
+
+    assert report.pass_rate.method == "exact_binomial"
+    # Only pass_rate uses McNemar's - the bootstrap-based metrics never set method.
+    assert report.latency_ms.method is None
+    assert report.cost_usd.method is None
+    assert report.mean_score.method is None
+
+
+def test_exact_threshold_is_configurable_and_changes_the_method_used():
+    ids = [f"c{i}" for i in range(20)]
+    baseline_passed = [True] * 18 + [False] * 2
+    candidate_passed = [False] * 10 + [True] * 10  # b+c=12
+
+    baseline_results = _results(ids, latency=100.0, cost=0.001)
+    candidate_results = _results(ids, latency=100.0, cost=0.001)
+
+    report = compare_runs(
+        baseline_results,
+        _scores(ids, baseline_passed),
+        candidate_results,
+        _scores(ids, candidate_passed),
+        exact_threshold=5,  # 12 >= 5 now, so this should take the chi_square path
+    )
+
+    assert report.pass_rate.method == "chi_square"
+
+
+def test_min_case_count_is_configurable_and_changes_the_power_warning():
+    ids = ["a", "b", "c"]
+    baseline_results = _results(ids, latency=100.0, cost=0.001)
+    candidate_results = _results(ids, latency=100.0, cost=0.001)
+
+    default_report = compare_runs(
+        baseline_results,
+        _scores(ids, [True, True, True]),
+        candidate_results,
+        _scores(ids, [True, True, True]),
+    )
+    assert default_report.power_warning is not None  # 3 < default min_case_count=10
+
+    overridden_report = compare_runs(
+        baseline_results,
+        _scores(ids, [True, True, True]),
+        candidate_results,
+        _scores(ids, [True, True, True]),
+        min_case_count=2,
+        min_discordant_pairs=0,
+    )
+    assert overridden_report.power_warning is None  # 3 >= 2, 0 discordant pairs >= 0

@@ -194,6 +194,28 @@ def compare(
     runs_dir: Path = typer.Option(
         DEFAULT_RUNS_DIR, "--runs-dir", help="Directory persisted runs are read from"
     ),
+    alpha: float = typer.Option(
+        0.05, "--alpha", help="Significance level for McNemar's test (pass_rate)"
+    ),
+    confidence: float = typer.Option(
+        0.95, "--confidence", help="Confidence level for the bootstrap CIs"
+    ),
+    min_case_count: int = typer.Option(
+        10,
+        "--min-case-count",
+        help="power_warning threshold: minimum common test cases expected",
+    ),
+    min_discordant_pairs: int = typer.Option(
+        10,
+        "--min-discordant-pairs",
+        help="power_warning threshold: minimum McNemar discordant pairs expected",
+    ),
+    exact_threshold: int = typer.Option(
+        25,
+        "--exact-threshold",
+        help="Below this many discordant pairs, use the exact binomial test "
+        "instead of the chi-square approximation for pass_rate",
+    ),
 ) -> None:
     """Compare two already-persisted runs and print a statistically-grounded
     comparison report."""
@@ -209,7 +231,15 @@ def compare(
         raise typer.Exit(code=1) from e
 
     report = compare_runs(
-        baseline.results, baseline.scores, candidate.results, candidate.scores
+        baseline.results,
+        baseline.scores,
+        candidate.results,
+        candidate.scores,
+        alpha=alpha,
+        confidence=confidence,
+        min_case_count=min_case_count,
+        min_discordant_pairs=min_discordant_pairs,
+        exact_threshold=exact_threshold,
     )
     logger.info(
         "comparison performed",
@@ -266,10 +296,11 @@ def compare(
     for metric in (report.pass_rate, report.latency_ms, report.cost_usd, report.mean_score):
         flag = "REGRESSION" if metric.flagged else "ok"
         if metric.p_value is not None:
+            method_suffix = f" ({metric.method})" if metric.method else ""
             typer.echo(
                 f"[{flag}] {metric.metric}: baseline={metric.baseline_mean:.4f} "
                 f"candidate={metric.candidate_mean:.4f} delta={metric.delta:+.4f} "
-                f"p={metric.p_value:.4g}"
+                f"p={metric.p_value:.4g}{method_suffix}"
             )
         else:
             typer.echo(
