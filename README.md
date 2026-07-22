@@ -1,5 +1,9 @@
 # Litmus
 
+![Python](https://img.shields.io/badge/python-3.12%2B-blue)
+![Tests](https://img.shields.io/badge/tests-125%20passing-brightgreen)
+![Status](https://img.shields.io/badge/status-active-success)
+
 **A real test, not a vibe check.**
 
 Litmus is an LLM evaluation and regression-testing tool. Given a prompt + model
@@ -33,12 +37,43 @@ uv run litmus compare <baseline_run_id> <candidate_run_id>
 uv run litmus serve
 ```
 
+## Features at a glance
+
+| | |
+|---|---|
+| **Real statistics, not deltas** | McNemar's test (exact binomial below a small discordant-pair count, chi-square above it) for pass/fail rate; a paired bootstrap CI for latency, cost, and mean score |
+| **Pluggable scoring** | exact/schema match, semantic similarity (embeddings), LLM-as-judge — the judge returns a continuous 0.0-1.0 confidence score, not a bare boolean |
+| **Catches quiet drift** | `mean_score` flags a model getting less confident/similar *before* enough cases flip to move the pass rate |
+| **Knows its own limits** | `power_warning` flags comparisons with too few cases or too few discordant pairs to trust the statistics |
+| **CI-native** | a GitHub Action that runs the suite on a PR and fails the job — and posts the reasoning — if a regression is real |
+| **Fast** | test cases run concurrently (`ThreadPoolExecutor`, default 4 workers) — a measured ~4.25x speedup over sequential on a 24-case set |
+| **One config file** | every threshold/default lives in `litmus.toml` — CLI flag > config file > hardcoded fallback |
+| **Zero infrastructure** | JSON per run, queried via DuckDB — no database server, git-diffable, works identically locally or in CI |
+| **Structured logs** | every run/comparison/API request logged as JSON Lines, independent of console output |
+| **Transparent by design** | mismatched or errored test cases between two runs are excluded from stats but always surfaced, never silently dropped |
+
 ## Architecture
+
+```mermaid
+flowchart LR
+    T["Test cases\n(testsets/*.json)"] --> R["Runner\n(concurrent, ThreadPoolExecutor)"]
+    R -->|"litellm"| M["Model under test"]
+    R --> S["Scorer\n(exact / semantic / judge)"]
+    S --> P["Persisted run\n(runs/*.json)"]
+    P --> C["Comparison engine\n(McNemar's + paired bootstrap)"]
+    C --> CLI["litmus compare\n(exit 1 on regression)"]
+    C --> API["litmus serve\n(FastAPI + DuckDB)"]
+    CLI --> CI["CI gate\n(GitHub Action, blocks the PR)"]
+    Cfg["litmus.toml"] -.->|"defaults"| R
+    Cfg -.-> C
+```
 
 - **Test case store** — versioned golden dataset (input, expected output/rubric,
   tags), as JSON/YAML files under `testsets/`, so test sets are diffable in git.
 - **Runner** — executes each test case against a target (prompt version + model),
-  capturing output, token cost, and latency.
+  capturing output, token cost, and latency. Runs concurrently by default
+  (`max_workers=4`, configurable) since real network calls dominate latency —
+  cases are fully independent, so this is a pure speedup, not a behavior change.
 - **Scorer** — pluggable strategies per test case: exact/schema match, semantic
   similarity (embeddings, cosine similarity thresholded into pass/fail), and
   LLM-as-judge against a rubric (the judge returns a continuous confidence
@@ -54,8 +89,8 @@ uv run litmus serve
   getting less confident/similar before enough cases flip to move the pass
   rate. A `power_warning` flags when there are too few test cases or too few
   discordant pairs for the statistics to be trustworthy. All of `alpha`,
-  `confidence`, `min_case_count`, `min_discordant_pairs`, and
-  `exact_threshold` are configurable via `litmus compare` options.
+  `confidence`, `min_case_count`, `min_discordant_pairs`, `exact_threshold`,
+  and `n_resamples` are configurable via `litmus compare` options or `litmus.toml`.
 - **History store** — every run persisted with timestamp + prompt/model version,
   so trendlines are possible, not just single comparisons.
 - **CI gate** — a GitHub Action that runs the suite on a PR touching prompts/model
@@ -65,6 +100,24 @@ uv run litmus serve
 - **Structured logging** — every run, comparison, and API request is logged as
   JSON Lines to `logs/litmus.jsonl` (rotating, gitignored), independent of the
   console output — see Observability below.
+
+## Configuration
+
+Every scattered default lives in one place: `litmus.toml` at the project root
+(not a `[tool.litmus]` section in `pyproject.toml` — the system under test
+doesn't have to be a Python project itself for Litmus's own config to apply).
+Fully commented-out by default; uncomment and adjust what you want to override.
+Precedence is **CLI flag > `litmus.toml` > hardcoded fallback**:
+
+```toml
+# litmus.toml
+alpha = 0.01
+min_case_count = 20
+max_workers = 8
+
+[scorers.llm_judge]
+threshold = 0.7
+```
 
 ## Stack
 
@@ -89,7 +142,7 @@ console output:
 ```
 
 Configurable via `--log-file`/`--log-level` (or `LITMUS_LOG_FILE`/
-`LITMUS_LOG_LEVEL`); defaults to `logs/litmus.jsonl` at `INFO`.
+`LITMUS_LOG_LEVEL`, or `litmus.toml`); defaults to `logs/litmus.jsonl` at `INFO`.
 
 ## Case study: catching a real prompt regression
 
@@ -186,6 +239,7 @@ shrinking the sample.
    locally validated, not yet exercised against a live PR
 6. ✅ Dashboard (JSON API — comparison, trends, per-run drill-down)
 7. ✅ README case study: a real caught regression with a real p-value (above)
+8. ✅ Concurrent test execution + a single consolidated config file (`litmus.toml`)
 
 ## CLI reference (comparison thresholds)
 
@@ -198,6 +252,11 @@ shrinking the sample.
 - `--exact-threshold` (default `25`) — below this many discordant pairs,
   `pass_rate` uses the exact binomial test instead of the chi-square
   approximation
+- `--n-resamples` (default `10000`) — bootstrap resample count
+
+`litmus run <testset_dir> --model <name>` also accepts `--max-workers`
+(default `4`) — concurrent LLM calls; all of the above are overridable
+project-wide via `litmus.toml` instead of passing flags every time.
 
 ## CI gate setup
 
@@ -216,20 +275,27 @@ persisted runs yet, the gate is skipped (nothing to compare against).
 
 ## Status
 
-All 10 milestones complete (103 tests passing, all offline/mocked except the
-real Gemini calls behind the case study above): schema, loader, runner, real
+125 tests passing (all offline/mocked except the real Gemini calls behind the
+case study above): schema, loader, runner (concurrent by default), real
 `litellm` execution, the `litmus run`/`litmus compare`/`litmus serve` CLI,
 all three scorers (including the judge's continuous confidence score), four
 comparison metrics (`pass_rate`, `latency_ms`, `cost_usd`, `mean_score`) with
 real significance testing and a `power_warning` for low-data comparisons,
 DuckDB-backed trend queries, the CI gate workflow (built and locally
 validated — not yet exercised against a live PR), the FastAPI dashboard,
-structured JSON-lines logging (see Observability above), and the case study
-above. A single test case's LLM/scoring failure is isolated (recorded as
-`[ERROR]`, doesn't lose the rest of the batch); mismatched or errored test
-cases between two runs being compared are excluded from the statistics but
-always surfaced explicitly, never silently dropped.
+structured JSON-lines logging, a single consolidated config file
+(`litmus.toml`), and the case study above. A single test case's LLM/scoring
+failure is isolated (recorded as `[ERROR]`, doesn't lose the rest of the
+batch); mismatched or errored test cases between two runs being compared are
+excluded from the statistics but always surfaced explicitly, never silently
+dropped.
 
-Not yet built: a rendered frontend for the dashboard (it's a JSON API today)
-and a hosted/deployed version — both explicitly out of scope for now, see
-`CLAUDE.md`.
+This project has been through seven rounds of adversarial code review, each
+finding and fixing real, distinct issues (a CI gate that never actually
+fired, a live smoke test catching a bug no mocked test could, a statistically
+misapplied significance test, and more) — see `CLAUDE.md` for the full
+decision log.
+
+Not yet built: a rendered frontend for the dashboard (it's a JSON API today),
+a hosted/deployed version, and a license file — all deliberate, not
+oversights, see `CLAUDE.md`.
