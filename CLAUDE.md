@@ -568,6 +568,33 @@ planning:
   start/end pair). Never assert on specific `latency_ms` values in a
   concurrency test — assert on ordering/content/pass-fail parity instead.
 
+## New decision: custom "use and modify, no redistribution" LICENSE
+
+The repo is now public (pushed to `github.com/IlionAcre/litmus`), which
+needed a license decision. The user explicitly wants: anyone may use and
+modify the software (including for private/internal/company purposes), but
+may **not** redistribute it, original or modified, to any third party in
+any form. This doesn't match any standard OSI-approved license (MIT/
+Apache/BSD all explicitly permit redistribution — that's core to what
+makes them "open source" in the legal sense), so `LICENSE` is a custom,
+non-SPDX text rather than a named license. GitHub will not show an
+automatic license badge for it. Flagged to the user: this is not
+lawyer-reviewed; treat it as a clear approximation of intent for a
+portfolio project, not a substitute for real legal review if the stakes
+ever become non-trivial. Don't swap this for a standard license (MIT,
+Apache, etc.) without the user explicitly re-deciding — the whole point was
+the no-redistribution clause a standard license wouldn't provide.
+
+## New decision: `.gitattributes` added (`* text=auto`)
+
+Every commit in this repo's history showed `LF will be replaced by CRLF`
+warnings from git, since development happened entirely on Windows with no
+line-ending normalization configured. Added `.gitattributes` with
+`* text=auto` so git normalizes to LF in the repository regardless of
+platform and converts to the local OS convention on checkout — prevents
+spurious whole-file diffs for anyone cloning from Linux/Mac. Purely a repo
+hygiene fix, no behavior change.
+
 ## Status
 
 All 16 checkpoints complete (125 tests passing). Full pipeline built and
