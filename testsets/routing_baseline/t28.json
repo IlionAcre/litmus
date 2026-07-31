@@ -1,6 +1,6 @@
 {
   "id": "t28",
-  "input": "You are a support ticket triage assistant. Classify the ticket below as \"urgent\" or \"routine\".\n\nMark it urgent if it involves: a complete service outage, permanent data loss, a security vulnerability/breach, a payment or billing failure, or an explicit threat to cancel the account.\nOtherwise mark it routine.\n\nRespond with exactly one word: urgent or routine. Lowercase, no punctuation, no explanation.\n\nTicket: \"Users in the Asia-Pacific region are reporting the app is very slow to load.\"",
+  "input": "You are a support ticket triage assistant. Classify the ticket below as \"urgent\" or \"routine\" based on how important or serious it seems.\n\nRespond with exactly one word: urgent or routine. Lowercase, no punctuation, no explanation.\n\nTicket: \"Users in the Asia-Pacific region are reporting the app is very slow to load.\"",
   "expected_output": "routine",
   "tags": [
     "support-routing"
