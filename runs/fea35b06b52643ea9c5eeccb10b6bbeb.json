@@ -1,0 +1,430 @@
+{
+  "run_id": "fea35b06b52643ea9c5eeccb10b6bbeb",
+  "prompt_version": "main",
+  "model_name": "gemini/gemini-2.5-flash-lite",
+  "created_at": "2026-07-31T01:36:19.628886Z",
+  "results": [
+    {
+      "test_case_id": "t01",
+      "raw_output": "urgent",
+      "latency_ms": 1099.6086000232026,
+      "cost_usd": 0.000011099999999999999,
+      "timestamp": "2026-07-31T01:36:16.985556Z",
+      "error": null
+    },
+    {
+      "test_case_id": "t02",
+      "raw_output": "urgent",
+      "latency_ms": 1144.1814999561757,
+      "cost_usd": 0.000011099999999999999,
+      "timestamp": "2026-07-31T01:36:17.031280Z",
+      "error": null
+    },
+    {
+      "test_case_id": "t03",
+      "raw_output": "urgent",
+      "latency_ms": 1123.8307999446988,
+      "cost_usd": 0.000011,
+      "timestamp": "2026-07-31T01:36:17.011705Z",
+      "error": null
+    },
+    {
+      "test_case_id": "t04",
+      "raw_output": "urgent",
+      "latency_ms": 892.7515000104904,
+      "cost_usd": 0.000011299999999999999,
+      "timestamp": "2026-07-31T01:36:16.781554Z",
+      "error": null
+    },
+    {
+      "test_case_id": "t05",
+      "raw_output": "urgent",
+      "latency_ms": 408.48410001490265,
+      "cost_usd": 0.000011599999999999999,
+      "timestamp": "2026-07-31T01:36:17.190603Z",
+      "error": null
+    },
+    {
+      "test_case_id": "t06",
+      "raw_output": "urgent",
+      "latency_ms": 873.570799943991,
+      "cost_usd": 0.0000107,
+      "timestamp": "2026-07-31T01:36:17.859671Z",
+      "error": null
+    },
+    {
+      "test_case_id": "t07",
+      "raw_output": "routine",
+      "latency_ms": 853.3786999760196,
+      "cost_usd": 0.0000112,
+      "timestamp": "2026-07-31T01:36:17.865713Z",
+      "error": null
+    },
+    {
+      "test_case_id": "t08",
+      "raw_output": "routine",
+      "latency_ms": 301.6621998976916,
+      "cost_usd": 0.0000107,
+      "timestamp": "2026-07-31T01:36:17.333701Z",
+      "error": null
+    },
+    {
+      "test_case_id": "t09",
+      "raw_output": "routine",
+      "latency_ms": 404.9128999467939,
+      "cost_usd": 0.000010599999999999998,
+      "timestamp": "2026-07-31T01:36:17.595502Z",
+      "error": null
+    },
+    {
+      "test_case_id": "t10",
+      "raw_output": "routine",
+      "latency_ms": 418.41699997894466,
+      "cost_usd": 0.000010599999999999998,
+      "timestamp": "2026-07-31T01:36:17.751934Z",
+      "error": null
+    },
+    {
+      "test_case_id": "t11",
+      "raw_output": "routine",
+      "latency_ms": 345.79529997427016,
+      "cost_usd": 0.000011099999999999999,
+      "timestamp": "2026-07-31T01:36:17.941183Z",
+      "error": null
+    },
+    {
+      "test_case_id": "t12",
+      "raw_output": "routine",
+      "latency_ms": 305.03849999513477,
+      "cost_usd": 0.000010799999999999998,
+      "timestamp": "2026-07-31T01:36:18.057590Z",
+      "error": null
+    },
+    {
+      "test_case_id": "t13",
+      "raw_output": "routine",
+      "latency_ms": 337.3318000230938,
+      "cost_usd": 0.0000112,
+      "timestamp": "2026-07-31T01:36:18.197346Z",
+      "error": null
+    },
+    {
+      "test_case_id": "t14",
+      "raw_output": "routine",
+      "latency_ms": 365.19100004807115,
+      "cost_usd": 0.000010899999999999999,
+      "timestamp": "2026-07-31T01:36:18.230409Z",
+      "error": null
+    },
+    {
+      "test_case_id": "t15",
+      "raw_output": "routine",
+      "latency_ms": 384.6901000943035,
+      "cost_usd": 0.000011799999999999999,
+      "timestamp": "2026-07-31T01:36:18.326875Z",
+      "error": null
+    },
+    {
+      "test_case_id": "t16",
+      "raw_output": "routine",
+      "latency_ms": 477.87499998230487,
+      "cost_usd": 0.000010899999999999999,
+      "timestamp": "2026-07-31T01:36:18.535393Z",
+      "error": null
+    },
+    {
+      "test_case_id": "t17",
+      "raw_output": "routine",
+      "latency_ms": 406.6436999710277,
+      "cost_usd": 0.000011499999999999998,
+      "timestamp": "2026-07-31T01:36:18.603841Z",
+      "error": null
+    },
+    {
+      "test_case_id": "t18",
+      "raw_output": "routine",
+      "latency_ms": 598.1216999934986,
+      "cost_usd": 0.000011099999999999999,
+      "timestamp": "2026-07-31T01:36:18.829383Z",
+      "error": null
+    },
+    {
+      "test_case_id": "t19",
+      "raw_output": "routine",
+      "latency_ms": 505.3804999915883,
+      "cost_usd": 0.0000112,
+      "timestamp": "2026-07-31T01:36:18.831522Z",
+      "error": null
+    },
+    {
+      "test_case_id": "t20",
+      "raw_output": "routine",
+      "latency_ms": 364.80030009988695,
+      "cost_usd": 0.0000117,
+      "timestamp": "2026-07-31T01:36:18.900533Z",
+      "error": null
+    },
+    {
+      "test_case_id": "t21",
+      "raw_output": "routine",
+      "latency_ms": 609.0936000691727,
+      "cost_usd": 0.000010799999999999998,
+      "timestamp": "2026-07-31T01:36:19.213601Z",
+      "error": null
+    },
+    {
+      "test_case_id": "t22",
+      "raw_output": "routine",
+      "latency_ms": 341.8466999428347,
+      "cost_usd": 0.0000112,
+      "timestamp": "2026-07-31T01:36:19.170649Z",
+      "error": null
+    },
+    {
+      "test_case_id": "t23",
+      "raw_output": "routine",
+      "latency_ms": 305.08990003727376,
+      "cost_usd": 0.000011099999999999999,
+      "timestamp": "2026-07-31T01:36:19.136987Z",
+      "error": null
+    },
+    {
+      "test_case_id": "t24",
+      "raw_output": "routine",
+      "latency_ms": 384.0712000383064,
+      "cost_usd": 0.000010799999999999998,
+      "timestamp": "2026-07-31T01:36:19.284896Z",
+      "error": null
+    },
+    {
+      "test_case_id": "t25",
+      "raw_output": "routine",
+      "latency_ms": 422.2000000299886,
+      "cost_usd": 0.000011,
+      "timestamp": "2026-07-31T01:36:19.560258Z",
+      "error": null
+    },
+    {
+      "test_case_id": "t26",
+      "raw_output": "routine",
+      "latency_ms": 390.4690000927076,
+      "cost_usd": 0.000011,
+      "timestamp": "2026-07-31T01:36:19.561777Z",
+      "error": null
+    },
+    {
+      "test_case_id": "t27",
+      "raw_output": "routine",
+      "latency_ms": 351.19870002381504,
+      "cost_usd": 0.000010899999999999999,
+      "timestamp": "2026-07-31T01:36:19.564777Z",
+      "error": null
+    },
+    {
+      "test_case_id": "t28",
+      "raw_output": "routine",
+      "latency_ms": 338.0818999139592,
+      "cost_usd": 0.0000112,
+      "timestamp": "2026-07-31T01:36:19.622843Z",
+      "error": null
+    }
+  ],
+  "scores": [
+    {
+      "test_case_id": "t01",
+      "passed": true,
+      "score": 1.0,
+      "explanation": "exact match",
+      "error": null
+    },
+    {
+      "test_case_id": "t02",
+      "passed": true,
+      "score": 1.0,
+      "explanation": "exact match",
+      "error": null
+    },
+    {
+      "test_case_id": "t03",
+      "passed": true,
+      "score": 1.0,
+      "explanation": "exact match",
+      "error": null
+    },
+    {
+      "test_case_id": "t04",
+      "passed": true,
+      "score": 1.0,
+      "explanation": "exact match",
+      "error": null
+    },
+    {
+      "test_case_id": "t05",
+      "passed": true,
+      "score": 1.0,
+      "explanation": "exact match",
+      "error": null
+    },
+    {
+      "test_case_id": "t06",
+      "passed": true,
+      "score": 1.0,
+      "explanation": "exact match",
+      "error": null
+    },
+    {
+      "test_case_id": "t07",
+      "passed": true,
+      "score": 1.0,
+      "explanation": "exact match",
+      "error": null
+    },
+    {
+      "test_case_id": "t08",
+      "passed": true,
+      "score": 1.0,
+      "explanation": "exact match",
+      "error": null
+    },
+    {
+      "test_case_id": "t09",
+      "passed": true,
+      "score": 1.0,
+      "explanation": "exact match",
+      "error": null
+    },
+    {
+      "test_case_id": "t10",
+      "passed": true,
+      "score": 1.0,
+      "explanation": "exact match",
+      "error": null
+    },
+    {
+      "test_case_id": "t11",
+      "passed": true,
+      "score": 1.0,
+      "explanation": "exact match",
+      "error": null
+    },
+    {
+      "test_case_id": "t12",
+      "passed": true,
+      "score": 1.0,
+      "explanation": "exact match",
+      "error": null
+    },
+    {
+      "test_case_id": "t13",
+      "passed": true,
+      "score": 1.0,
+      "explanation": "exact match",
+      "error": null
+    },
+    {
+      "test_case_id": "t14",
+      "passed": true,
+      "score": 1.0,
+      "explanation": "exact match",
+      "error": null
+    },
+    {
+      "test_case_id": "t15",
+      "passed": true,
+      "score": 1.0,
+      "explanation": "exact match",
+      "error": null
+    },
+    {
+      "test_case_id": "t16",
+      "passed": true,
+      "score": 1.0,
+      "explanation": "exact match",
+      "error": null
+    },
+    {
+      "test_case_id": "t17",
+      "passed": true,
+      "score": 1.0,
+      "explanation": "exact match",
+      "error": null
+    },
+    {
+      "test_case_id": "t18",
+      "passed": true,
+      "score": 1.0,
+      "explanation": "exact match",
+      "error": null
+    },
+    {
+      "test_case_id": "t19",
+      "passed": true,
+      "score": 1.0,
+      "explanation": "exact match",
+      "error": null
+    },
+    {
+      "test_case_id": "t20",
+      "passed": true,
+      "score": 1.0,
+      "explanation": "exact match",
+      "error": null
+    },
+    {
+      "test_case_id": "t21",
+      "passed": true,
+      "score": 1.0,
+      "explanation": "exact match",
+      "error": null
+    },
+    {
+      "test_case_id": "t22",
+      "passed": true,
+      "score": 1.0,
+      "explanation": "exact match",
+      "error": null
+    },
+    {
+      "test_case_id": "t23",
+      "passed": true,
+      "score": 1.0,
+      "explanation": "exact match",
+      "error": null
+    },
+    {
+      "test_case_id": "t24",
+      "passed": true,
+      "score": 1.0,
+      "explanation": "exact match",
+      "error": null
+    },
+    {
+      "test_case_id": "t25",
+      "passed": true,
+      "score": 1.0,
+      "explanation": "exact match",
+      "error": null
+    },
+    {
+      "test_case_id": "t26",
+      "passed": true,
+      "score": 1.0,
+      "explanation": "exact match",
+      "error": null
+    },
+    {
+      "test_case_id": "t27",
+      "passed": true,
+      "score": 1.0,
+      "explanation": "exact match",
+      "error": null
+    },
+    {
+      "test_case_id": "t28",
+      "passed": true,
+      "score": 1.0,
+      "explanation": "exact match",
+      "error": null
+    }
+  ]
+}

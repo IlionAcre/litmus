@@ -595,6 +595,52 @@ platform and converts to the local OS convention on checkout — prevents
 spurious whole-file diffs for anyone cloning from Linux/Mac. Purely a repo
 hygiene fix, no behavior change.
 
+## New decision: standing CI gate testset switched to `testsets/routing_baseline`
+
+`eval-gate.yml` previously ran against `testsets/example` (2 cases). Actually
+attempting a live PR test (the first time this workflow was ever exercised
+against a real GitHub Actions run, not just locally validated) surfaced two
+real problems `testsets/example` could never have been caught by:
+
+1. **Structurally no statistical power.** McNemar's test needs enough
+   discordant pairs to reach significance; with only 2 cases, at most 1 can
+   ever flip, which `mcnemar_test`'s own math can't call significant
+   (`binomtest(0-or-1, 1, 0.5)` is never below any reasonable `alpha`). The
+   gate could never have actually blocked a real regression on this
+   testset, regardless of how it was wired.
+2. **No committed baseline run existed for it at all.** The two runs
+   already committed to `runs/` on `main` were the Phase 10 case-study data
+   (`testsets/routing_baseline`/`routing_candidate`, 28 cases, `t01`..`t28`
+   ids). The gate's baseline-selection logic (`query_trends()[-1]`, "the
+   single most recent run on the base branch, project-wide, no testset
+   scoping") would have picked one of those as "baseline" and compared it
+   against a fresh `testsets/example` run, zero overlapping `test_case_id`s
+   between them, which `compare_runs()` correctly raises `ValueError` for.
+   That uncaught exception would have surfaced as a raw traceback in the PR
+   comment instead of a clean comparison, not a clean gate failure.
+
+Fixed by switching the gate's standing target to `testsets/routing_baseline`
+(the already-proven, 28-case, real-power testset from the case study) and
+persisting a fresh real baseline run against it
+(`runs/fea35b06b52643ea9c5eeccb10b6bbeb.json`, `prompt_version="main"`,
+28/28 passed, real Gemini call, ~$0.0003) so it's chronologically the
+latest run on `main` (the two existing case-study runs are older;
+`d8d16e16...`, the *bad* "candidate" prompt run, was previously the
+chronologically latest of the two, which would have been picked as
+"baseline" backwards).
+
+**Known, not-yet-fixed limitation, surfaced by this same investigation:**
+the gate's baseline selection still isn't scoped by testset, it just picks
+the single most recent run on the base branch project-wide. This works
+correctly today because there's only one actively-maintained testset the
+gate targets, but if a second testset were ever added and its own runs
+started getting committed to `main`, the "latest run overall" heuristic
+could again pick an incompatible baseline. A real fix would need
+`query_trends`/the workflow's baseline-selection query to filter by which
+testset produced a run (e.g. by `test_case_id` overlap, or an explicit
+testset tag), not just recency. Not fixed in this pass; worth doing if a
+second testset is ever added to the gate's scope.
+
 ## Status
 
 All 16 checkpoints complete (125 tests passing). Full pipeline built and
