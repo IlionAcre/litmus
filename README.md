@@ -235,11 +235,34 @@ shrinking the sample.
    similarity, LLM-as-judge)
 3. ✅ Comparison engine: baseline vs. candidate with real stats, not just deltas
 4. ✅ Persistence + trend view across versions
-5. ✅ GitHub Action CI gate (PR fails/comments on regression), built and
-   locally validated, not yet exercised against a live PR
+5. ✅ GitHub Action CI gate (PR fails/comments on regression), validated on a
+   real PR against GitHub Actions (see below)
 6. ✅ Dashboard (JSON API: comparison, trends, per-run drill-down)
 7. ✅ README case study: a real caught regression with a real p-value (above)
 8. ✅ Concurrent test execution + a single consolidated config file (`litmus.toml`)
+
+## CI gate: verified live
+
+Not just locally validated: a real throwaway PR against `github.com/IlionAcre/litmus`
+confirmed the whole pipeline end-to-end on GitHub's own infrastructure, real
+Gemini calls included. The Action correctly fetched the right baseline,
+detected a deliberately-introduced regression, and posted this as a real PR
+comment before failing the check:
+
+```text
+[REGRESSION] pass_rate: baseline=1.0000 candidate=0.5000 delta=-0.5000 p=0.0001221 (exact_binomial)
+[ok] latency_ms: baseline=526.9185 candidate=280.0910 delta=-246.8275 95% CI=[-337.1, -165.6]
+[ok] cost_usd: baseline=0.0000 candidate=0.0000 delta=-0.0000 95% CI=[-3.6e-06, -3.6e-06]
+[REGRESSION] mean_score: baseline=1.0000 candidate=0.5000 delta=-0.5000 95% CI=[-0.6786, -0.3214]
+Result: REGRESSION DETECTED
+```
+
+Latency and cost correctly stayed unflagged despite real differences (the
+candidate was actually faster), since only a metric moving in the *worse*
+direction gets flagged. The test PR was closed without merging; see
+`CLAUDE.md` for what the live run found and fixed along the way (a
+`GITHUB_TOKEN` permissions gap for posting PR comments, and switching the
+gate's standing testset to one with real statistical power).
 
 ## CLI reference (comparison thresholds)
 
@@ -281,8 +304,8 @@ case study above): schema, loader, runner (concurrent by default), real
 all three scorers (including the judge's continuous confidence score), four
 comparison metrics (`pass_rate`, `latency_ms`, `cost_usd`, `mean_score`) with
 real significance testing and a `power_warning` for low-data comparisons,
-DuckDB-backed trend queries, the CI gate workflow (built and locally
-validated, not yet exercised against a live PR), the FastAPI dashboard,
+DuckDB-backed trend queries, the CI gate workflow (verified on a real PR
+against GitHub Actions, see above), the FastAPI dashboard,
 structured JSON-lines logging, a single consolidated config file
 (`litmus.toml`), and the case study above. A single test case's LLM/scoring
 failure is isolated (recorded as `[ERROR]`, doesn't lose the rest of the
@@ -296,6 +319,7 @@ fired, a live smoke test catching a bug no mocked test could, a statistically
 misapplied significance test, and more). See `CLAUDE.md` for the full
 decision log.
 
-Not yet built: a rendered frontend for the dashboard (it's a JSON API today),
-a hosted/deployed version, and a license file. All deliberate, not
-oversights; see `CLAUDE.md`.
+Not yet built: a rendered frontend for the dashboard (it's a JSON API today)
+and a hosted/deployed version. Both deliberate, not oversights; see
+`CLAUDE.md`. Licensed under a custom use-and-modify, no-redistribution
+license, see `LICENSE`.

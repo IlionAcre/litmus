@@ -431,8 +431,9 @@ stays high-level only; don't duplicate phase detail here.
 5. Scoring: LLM-as-judge — **done**
 6a/6b/6c. Comparison engine with real statistical tests — **done**
 7a/7b. Persistence (JSON results) + DuckDB trend queries — **done**
-8. CI gate via GitHub Action — **done (built + locally validated only — not
-   pushed or tested against a live PR; needs user go-ahead)**
+8. CI gate via GitHub Action — **done (built, locally validated, and
+   verified on a real PR against GitHub Actions; see the CI gate decision
+   entries below)**
 9. Dashboard (FastAPI + DuckDB) — **done**
 10. README case study with a real caught regression — **done**
 
@@ -679,7 +680,7 @@ unused/methodologically-wrong Mann-Whitney U, a non-independent statistical
 test assertion, and no duplicate-test-case-id validation at load time. All
 fixed with tests; see the decision entries above for what changed and why.
 
-Remaining, not gaps but explicit scope boundaries: Phase 8's workflow is
-locally validated only, not pushed/tested against a live PR (still needs
-user go-ahead); no rendered dashboard frontend; no hosted deployment. See
-`AI_docs/PHASES.md` for full phase detail.
+Remaining, not gaps but explicit scope boundaries: no rendered dashboard
+frontend; no hosted deployment. Phase 8's workflow has since been verified
+on a real PR against GitHub Actions, not just locally, see the CI gate
+decision entries below. See `AI_docs/PHASES.md` for full phase detail.
