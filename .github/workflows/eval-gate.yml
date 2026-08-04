@@ -9,6 +9,8 @@ on:
 jobs:
   eval-gate:
     runs-on: ubuntu-latest
+    permissions:
+      pull-requests: write
     steps:
       - name: Checkout PR branch
         uses: actions/checkout@v4
