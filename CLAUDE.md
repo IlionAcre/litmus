@@ -682,6 +682,17 @@ cases errored)" instead of silently reporting a false result, both features
 built earlier in this project working exactly as designed under a real,
 unplanned failure mode, not just their own unit tests.
 
+## New decision: added `.github/workflows/tests.yml`
+
+`eval-gate.yml` is a distinct, specific-purpose workflow (statistical
+regression testing on prompt/model changes) — nothing was actually running
+the 125-test suite itself on push/PR, so a change that broke tests
+wouldn't be caught by anything on GitHub, only by running `pytest` locally.
+Added a plain `uv sync --all-groups && uv run pytest -v` workflow on every
+push to `main` and every PR, needing no secrets since the whole suite is
+offline/mocked. `README.md`'s test badge now points at this workflow's real
+status instead of a static "125 passing" badge.
+
 ## Status
 
 All 16 checkpoints complete (125 tests passing). Full pipeline built and

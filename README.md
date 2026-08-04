@@ -1,7 +1,7 @@
 # Litmus
 
 ![Python](https://img.shields.io/badge/python-3.12%2B-blue)
-![Tests](https://img.shields.io/badge/tests-125%20passing-brightgreen)
+![Tests](https://github.com/IlionAcre/litmus/actions/workflows/tests.yml/badge.svg)
 ![Status](https://img.shields.io/badge/status-active-success)
 
 **A real test, not a vibe check.**
