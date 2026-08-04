@@ -135,7 +135,7 @@ def run(
 ) -> None:
     """Run a test set against a model, print each result, and persist the
     run. A case that errors (LLM call or scoring failure) doesn't abort the
-    batch — it's recorded as [ERROR] and the run is still saved with
+    batch: it's recorded as [ERROR] and the run is still saved with
     whatever cases did succeed."""
     try:
         cases = load_test_cases(testset_dir)

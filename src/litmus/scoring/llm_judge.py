@@ -38,7 +38,7 @@ class _JudgeVerdict(BaseModel):
 class JudgeParseError(Exception):
     """Raised when the judge model's response can't be parsed into a verdict.
 
-    Deliberately raised rather than silently coerced into a pass/fail — a
+    Deliberately raised rather than silently coerced into a pass/fail: a
     judge that returns garbage (or an out-of-range score) should be a loud
     failure, not a quiet one.
     """

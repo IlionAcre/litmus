@@ -48,9 +48,9 @@ class ComparisonReport:
 
     @property
     def has_mismatched_cases(self) -> bool:
-        """True iff the comparison excluded any test case — either because
+        """True iff the comparison excluded any test case, either because
         it wasn't present in both runs, or because it errored in one of
-        them. Callers (CLI/API) must surface this, not bury it — a narrowed
+        them. Callers (CLI/API) must surface this, not bury it: a narrowed
         comparison that looks like a full one undermines the whole point of
         a statistical regression tool."""
         return bool(
@@ -82,7 +82,7 @@ def _align(
     runs AND neither side recorded an error for it (see RunResult.error /
     ScoreResult.error). Everything excluded is reported back explicitly
     (baseline_only_ids / candidate_only_ids / errored_ids) rather than
-    silently dropped — a testset changing between runs, or a case erroring,
+    silently dropped: a testset changing between runs, or a case erroring,
     is normal usage, not something to hide.
     """
     baseline_results_by_id = {r.test_case_id: r for r in baseline_results}
@@ -143,7 +143,7 @@ def compare_runs(
 
     pass_rate uses McNemar's test (paired pass/fail). latency_ms/cost_usd/
     mean_score use a paired bootstrap CI for the mean difference, not
-    Mann-Whitney U — all three metrics are paired (same test case,
+    Mann-Whitney U, since all three metrics are paired (same test case,
     before/after), and a paired bootstrap respects that pairing instead of
     treating baseline/candidate as independent samples (see CLAUDE.md).
 

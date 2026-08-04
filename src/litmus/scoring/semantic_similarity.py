@@ -19,7 +19,7 @@ def _cosine_similarity(a: list[float], b: list[float]) -> float:
 
 class SemanticSimilarityScorer:
     """Passes iff the cosine similarity between raw_output and
-    expected_output embeddings (via litellm.embedding() — see CLAUDE.md, no
+    expected_output embeddings (via litellm.embedding(), see CLAUDE.md, no
     local sentence-transformers model) meets a threshold."""
 
     def __init__(self, model: str = DEFAULT_MODEL, threshold: float = DEFAULT_THRESHOLD):

@@ -32,11 +32,11 @@ def bootstrap_diff_ci(
     """Paired bootstrap CI for the mean difference (candidate - baseline).
 
     baseline[i] and candidate[i] must correspond to the same unit (e.g. the
-    same test_case_id, before/after) — this is paired continuous data, not
+    same test_case_id, before/after): this is paired continuous data, not
     two independent samples, so it resamples the per-unit differences
     directly rather than resampling baseline and candidate independently
     (which would silently ignore the pairing, same methodological error as
-    using Mann-Whitney U here — see CLAUDE.md)."""
+    using Mann-Whitney U here, see CLAUDE.md)."""
     if len(baseline) != len(candidate):
         raise ValueError(
             "baseline and candidate must be the same length (they are paired per unit)"
@@ -71,7 +71,7 @@ def mcnemar_test(
     exact_threshold: int = 25,
 ) -> McNemarResult:
     """Manually-implemented McNemar's test for paired pass/fail-rate
-    comparisons. Hand-rolled deliberately — see CLAUDE.md: no `statsmodels`
+    comparisons. Hand-rolled deliberately, see CLAUDE.md: no `statsmodels`
     dependency for this one function.
 
     Uses the exact binomial test (via scipy.stats.binomtest - already an
