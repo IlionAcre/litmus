@@ -641,6 +641,25 @@ testset produced a run (e.g. by `test_case_id` overlap, or an explicit
 testset tag), not just recency. Not fixed in this pass; worth doing if a
 second testset is ever added to the gate's scope.
 
+## New decision: `eval-gate.yml` needs an explicit `permissions:` block
+
+The first-ever live PR run of the gate (PR #1, a deliberate test regression,
+closed without merging) surfaced a real bug: the "Post comparison as a PR
+comment" step failed with `HttpError: Resource not accessible by
+integration`. The workflow never declared a `permissions:` block, so it
+inherited this repo's default `GITHUB_TOKEN` permissions, which don't
+include posting PR comments. Fixed by adding `permissions: pull-requests:
+write` at the job level. Everything upstream of that step (checkout, sync,
+fetch baseline, run eval suite, compare) worked correctly on the first real
+run, including a genuinely good sign found along the way: every one of the
+28 candidate-run cases hit `APIConnectionError: Missing Gemini API key`
+(the `GEMINI_API_KEY` repo secret wasn't set yet at test time) and every
+single one degraded cleanly to `[ERROR]` instead of crashing the run, and
+`compare_runs()` correctly raised a clear "no common test_case_ids (all
+cases errored)" instead of silently reporting a false result, both features
+built earlier in this project working exactly as designed under a real,
+unplanned failure mode, not just their own unit tests.
+
 ## Status
 
 All 16 checkpoints complete (125 tests passing). Full pipeline built and
