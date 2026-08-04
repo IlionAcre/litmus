@@ -143,6 +143,27 @@ the project or change the tagline without the user explicitly asking.
   (`completion`, `completion_cost`, `embedding`). Revisit this pin if the
   Windows dev environment's Rust/linker setup ever gets fixed, or if a future
   litellm release ships Windows wheels again — don't just bump blindly.
+  - Revised (made platform-conditional): confirmed via PyPI's JSON API that
+    `litellm` 1.92.0 ships real prebuilt `manylinux_2_28` wheels for
+    `cp312` (both x86_64 and aarch64) with no build step needed, alongside
+    the confirmed-missing `win_amd64` wheel. The Rust-build failure is
+    genuinely Windows-only, so the blanket `<1.90` pin was unnecessarily
+    capping Linux (including this project's own GitHub Actions CI runner)
+    at an older version for no real reason. Changed to two PEP 508
+    marker-conditioned entries in `pyproject.toml`: `litellm<1.90;
+    sys_platform == 'win32'` and `litellm; sys_platform != 'win32'`.
+    Verified `uv lock`/`uv sync`/the full test suite still work correctly
+    on this Windows machine afterward. Note: the regenerated `uv.lock`
+    still resolves to `1.89.6` on *every* platform right now, not just
+    Windows, since `uv lock`'s incremental resolution prefers keeping an
+    already-valid pinned version over gratuitously bumping it, and
+    `1.89.6` still satisfies the now-unbounded non-Windows constraint too.
+    This change only removes the artificial ceiling for the future, it
+    doesn't itself force an immediate version bump. A future
+    `uv lock --upgrade-package litellm` would let non-Windows environments
+    move past 1.90 without touching the Windows constraint, whenever
+    there's an actual reason to (no confirmed bugfix in 1.90+ relevant to
+    this project's usage has been identified yet).
 
 - **Structured logging: stdlib `logging` + a custom JSON-lines formatter, no
   new dependency.** Matches the same avoid-a-dependency-for-something-stdlib-
