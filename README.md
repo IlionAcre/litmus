@@ -81,19 +81,52 @@ flowchart LR
 - **Dashboard**: a JSON API for the latest comparison, historical trends, and
   per-case drill-down.
 
-## Example
+## Examples
+
+### Catching a real regression
 
 A support-ticket triage classifier: the baseline prompt gives explicit urgency
 criteria, the candidate asks the model to "use your judgement" instead, a
 plausible real-world prompt edit.
 
 ```
-$ uv run litmus compare <baseline_run_id> <candidate_run_id>
+$ uv run litmus run testsets/routing_baseline --model gemini/gemini-2.5-flash-lite --prompt-version baseline
+[PASS] t01: 'urgent' (412.3ms, $0.000011)
+[PASS] t02: 'routine' (389.7ms, $0.000011)
+...
+Saved run cd06b0e6c44d4db0a3584e8e608a2777 to runs
+
+$ uv run litmus run testsets/routing_candidate --model gemini/gemini-2.5-flash-lite --prompt-version candidate
+[PASS] t01: 'urgent' (398.1ms, $0.000011)
+[FAIL] t02: 'urgent' (401.2ms, $0.000011)
+...
+Saved run d8d16e16c5e442859ad1a13111c93ec0 to runs
+
+$ uv run litmus compare cd06b0e6c44d4db0a3584e8e608a2777 d8d16e16c5e442859ad1a13111c93ec0
 [REGRESSION] pass_rate: baseline=0.9643 candidate=0.5000 delta=-0.4643 p=0.0008741
+[ok] latency_ms: baseline=398.0661 candidate=373.5803 delta=-24.4858 95% CI=[-63.61, 11.93]
+[ok] cost_usd: baseline=0.0000 candidate=0.0000 delta=-0.0000 95% CI=[-3.6e-06, -3.6e-06]
 Result: REGRESSION DETECTED
 ```
 
-Pass rate dropped from 96.4% to 50.0%, caught with p = 0.00087, not a guess.
+Pass rate dropped from 96.4% to 50.0%, a 46-point swing. Latency and cost moved
+too, but stayed unflagged: only a metric moving in the *worse* direction counts
+as a regression, and the candidate was actually a little faster and cheaper here.
+
+### Flagging a test set that's too small to trust
+
+The same 28-ticket comparison above, checked against a higher case-count bar:
+
+```
+$ uv run litmus compare cd06b0e6c44d4db0a3584e8e608a2777 d8d16e16c5e442859ad1a13111c93ec0 --min-case-count 30
+NOTE: low statistical power - only 28 common test case(s) (wanted at least 30).
+[REGRESSION] pass_rate: baseline=0.9643 candidate=0.5000 delta=-0.4643 p=0.0008741
+...
+```
+
+The comparison still runs, the regression is still real, but Litmus tells you
+up front when a test set is thin enough that a smaller effect could have gone
+undetected, rather than presenting every result with the same confidence.
 
 ## Configuration
 
