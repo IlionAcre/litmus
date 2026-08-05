@@ -2,8 +2,8 @@
 # Litmus's defaults for this project. CLI flags, where available, still
 # override this file; this file overrides the hardcoded defaults shown
 # below. This file is deliberately standalone (not a [tool.litmus] section
-# in pyproject.toml) — the system under test doesn't have to be a Python
-# project itself for Litmus's own config to apply.
+# in pyproject.toml), since the system under test doesn't have to be a
+# Python project itself for Litmus's own config to apply.
 # runs_dir = "runs"
 # log_file = "logs/litmus.jsonl"
 # log_level = "INFO"
